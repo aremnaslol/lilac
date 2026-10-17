@@ -1,14 +1,34 @@
+--[[
+	LILAC v2 — interface + test-game features
+	Two-column cards, sub-tabs, HSV color picker, dropdown popups, keybinds,
+	tooltips, toasts, config export/import and a fully reactive live preview.
+
+	LocalScript for your OWN test game (StarterPlayerScripts / StarterGui).
+	The ESP / combat / movement modules act on real players in the server you
+	are testing in. Menu key: RightShift (rebindable in Settings).
+]]
+
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
+local Lighting = game:GetService("Lighting")
 
 if _G.__LilacCleanup then pcall(_G.__LilacCleanup) end
 
+print("[Lilac] starting...")
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+if not player then
+	warn("[Lilac] No LocalPlayer. You are in Edit mode. Press Play (or Run a client) first, then execute again.")
+	return
+end
+local playerGui = player:WaitForChild("PlayerGui", 10)
+if not playerGui then
+	warn("[Lilac] PlayerGui never loaded.")
+	return
+end
 local stale = playerGui:FindFirstChild("LilacUI")
 if stale then stale:Destroy() end
 
@@ -16,6 +36,7 @@ if stale then stale:Destroy() end
 -- lifecycle
 --------------------------------------------------------------------------
 local connections = {}
+local cleanups = {}
 local gui
 
 local function connect(signal, fn)
@@ -25,6 +46,8 @@ local function connect(signal, fn)
 end
 
 local function unload()
+	for _, f in ipairs(cleanups) do pcall(f) end
+	table.clear(cleanups)
 	for _, c in ipairs(connections) do
 		pcall(function() c:Disconnect() end)
 	end
@@ -192,6 +215,28 @@ local function isMove(i)
 		or i.UserInputType == Enum.UserInputType.Touch
 end
 
+local function matchesBind(i, name)
+	if not name then return false end
+	if i.UserInputType == Enum.UserInputType.Keyboard then return i.KeyCode.Name == name end
+	return i.UserInputType.Name == name
+end
+
+local keyEnumCache = {}
+local function bindDown(name)
+	if not name then return false end
+	if name:sub(1, 11) == "MouseButton" then
+		local ok, ut = pcall(function() return Enum.UserInputType[name] end)
+		return (ok and ut and UserInputService:IsMouseButtonPressed(ut)) or false
+	end
+	local kc = keyEnumCache[name]
+	if kc == nil then
+		local ok, v = pcall(function() return Enum.KeyCode[name] end)
+		kc = ok and v or false
+		keyEnumCache[name] = kc
+	end
+	return (kc and UserInputService:IsKeyDown(kc)) or false
+end
+
 local accentBinds = {}
 local function bindAccent(fn)
 	table.insert(accentBinds, fn)
@@ -350,6 +395,7 @@ local root = create("Frame", {
 	BackgroundTransparency = 1,
 }, gui)
 
+local modalBtn = create("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0), Modal = true }, gui)
 local uiScale = create("UIScale", {}, root)
 local userScale = 1
 local function fit()
@@ -954,18 +1000,20 @@ end
 --------------------------------------------------------------------------
 -- live preview panel
 --------------------------------------------------------------------------
+local preview, previewGlow, previewGlowStroke, char, parts, renderPreview, updatePreviewVisible
+do -- preview scope (keeps the main chunk under the 200-local limit)
 local SW, SH = 240, 504
 local PH = 560
 
-local previewGlow = create("Frame", {
+previewGlow = create("Frame", {
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(MAIN_W + 14 - 3, -3),
 	Size = UDim2.fromOffset(PREVIEW_W + 6, PH + 6),
 }, root)
 corner(previewGlow, 17)
-local previewGlowStroke = stroke(previewGlow, Theme.Accent, 6, 0.84)
+previewGlowStroke = stroke(previewGlow, Theme.Accent, 6, 0.84)
 
-local preview = create("Frame", {
+preview = create("Frame", {
 	Name = "Preview",
 	BackgroundColor3 = Theme.Bg,
 	Position = UDim2.fromOffset(MAIN_W + 14, 0),
@@ -1062,7 +1110,7 @@ end
 local tracer = newLine(screen, 2)
 
 -- character
-local char = create("Frame", {
+char = create("Frame", {
 	Name = "Char",
 	BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1072,7 +1120,7 @@ local char = create("Frame", {
 }, screen)
 local charScale = create("UIScale", {}, char)
 
-local parts = {}
+parts = {}
 local function part(name, x, y, w, h, r)
 	local f = create("Frame", {
 		Name = name,
@@ -1297,7 +1345,7 @@ end)
 
 -- preview collapse
 local pvCollapsed = false
-local function updatePreviewVisible()
+function updatePreviewVisible()
 	local show = Settings["set.preview"] ~= false and not (main.Size.Y.Offset < 100)
 	preview.Visible = show
 	previewGlow.Visible = show
@@ -1311,7 +1359,7 @@ pvMin.MouseButton1Click:Connect(function()
 end)
 
 -- render everything from Settings
-local function renderPreview()
+function renderPreview()
 	local S = Settings
 	if S["esp.enabled"] == nil then return end
 	local on = S["esp.enabled"]
@@ -1470,6 +1518,8 @@ local function renderPreview()
 	crossRing.Size = UDim2.fromOffset((gap + size) * 2, (gap + size) * 2)
 	crossRingStroke.Thickness, crossRingStroke.Color = ct, cc
 end
+
+end -- preview scope
 
 --------------------------------------------------------------------------
 -- rows
@@ -1740,7 +1790,7 @@ local function makeRow(body, def)
 	elseif kind == "keybind" then
 		reg(def)
 		local btn = create("TextButton", {
-			Text = Settings[key].Name,
+			Text = Settings[key],
 			AutoButtonColor = false,
 			Font = BODY,
 			TextSize = 11,
@@ -1753,21 +1803,30 @@ local function makeRow(body, def)
 		}, row)
 		corner(btn, 8)
 		stroke(btn, Theme.Border, 1)
-		Controls[key] = { apply = function(v) btn.Text = v.Name end }
+		Controls[key] = { apply = function(v) btn.Text = v end }
 		btn.MouseButton1Click:Connect(function()
 			_G.__LilacBinding = true
+			_G.__LilacBindStart = os.clock()
 			btn.Text = "press a key..."
 		end)
 		connect(UserInputService.InputBegan, function(i)
 			if not _G.__LilacBinding or btn.Text ~= "press a key..." then return end
-			if i.UserInputType ~= Enum.UserInputType.Keyboard then return end
+			local name
+			local ut = i.UserInputType
+			if ut == Enum.UserInputType.Keyboard then
+				name = i.KeyCode.Name
+			elseif ut == Enum.UserInputType.MouseButton1 or ut == Enum.UserInputType.MouseButton2 or ut == Enum.UserInputType.MouseButton3 then
+				name = ut.Name
+			end
+			if not name then return end
+			if os.clock() - (_G.__LilacBindStart or 0) < 0.15 then return end
 			_G.__LilacBinding = false
 			_G.__LilacBindTime = os.clock()
-			if i.KeyCode == Enum.KeyCode.Escape then
-				btn.Text = Settings[key].Name
+			if name == "Escape" then
+				btn.Text = Settings[key]
 			else
-				btn.Text = i.KeyCode.Name
-				commit(key, i.KeyCode)
+				btn.Text = name
+				commit(key, name)
 			end
 		end)
 
@@ -2124,10 +2183,40 @@ buildPage("Combat", {
 		C("hit.color", "Hit Color", rgb(255, 80, 100), "Hit marker color"),
 		S("hit.size", "Hit Size", 4, 18, 8, "Hit marker size"),
 	} },
+	{ title = "Aimbot", col = 1, rows = {
+		T("aim.enabled", "Aim Assist", false, "Pull the camera onto a target"),
+		{ type = "keybind", key = "aim.key", name = "Aim Key", default = "Q", tip = "Keyboard key or mouse button" },
+		D("aim.mode", "Activation", { "Hold", "Toggle", "Always" }, "Hold the key, toggle it, or always on"),
+		S("aim.smooth", "Smoothness", 1, 30, 8, "1 = instant snap, higher = slower"),
+		D("aim.bone", "Bone", { "Head", "Torso", "Closest" }, "Which body part to aim at"),
+		T("aim.wall", "Wall Check", true, "Ignore targets behind geometry"),
+		T("aim.team", "Team Check", true, "Ignore teammates"),
+		T("aim.hpcheck", "Health Check", true, "Skip dead targets and targets with a ForceField"),
+		S("aim.minhp", "Min Target HP %", 0, 100, 0, "Ignore targets below this health percent"),
+	} },
+	{ title = "FOV", col = 2, rows = {
+		S("fov.size", "FOV Radius", 20, 400, 120, "Pixels around the cursor that can be targeted"),
+		T("fov.draw", "Draw FOV Circle", true, "Show the activation circle"),
+		C("fov.color", "FOV Color", rgb(240, 130, 200), "Circle color"),
+	} },
+	{ title = "Triggerbot", col = 2, rows = {
+		T("trig.enabled", "Triggerbot", false, "Activates your equipped Tool when the cursor is on an enemy"),
+		{ type = "keybind", key = "trig.key", name = "Trigger Key", default = "E", tip = "Keyboard key or mouse button" },
+		D("trig.mode", "Activation", { "Hold", "Toggle", "Always" }, "Hold the key, toggle it, or always on"),
+		S("trig.delay", "Delay (ms)", 0, 300, 60, "Wait before firing"),
+		T("trig.wall", "Wall Check", true, "Only fire at targets you can actually see"),
+		T("trig.team", "Team Check", true, "Ignore teammates"),
+		T("trig.hpcheck", "Health Check", true, "Skip dead targets and targets with a ForceField"),
+	} },
+	{ title = "Hitbox", col = 1, rows = {
+		T("hb.enabled", "Hitbox Expander", false, "Enlarges enemy root parts on YOUR client only"),
+		S("hb.size", "Hitbox Size", 2, 20, 6, "Studs"),
+	} },
 })
 
 buildPage("ESP", {
 	{ title = "ESP Options", col = 1, rows = {
+		T("live.esp", "In-Game ESP", true, "Apply the ESP settings to real players (uses every ESP option here)"),
 		T("esp.enabled", "ESP Enabled", true, "Master switch for every preview overlay"),
 		T("esp.highlight", "Highlight", false, "Tint and outline the body (see Tracers / Chams)"),
 		T("esp.box", "Box", true, "Bounding box around the model"),
@@ -2213,6 +2302,10 @@ buildPage("World", {
 	{ title = "Lighting", col = 2, rows = {
 		C("world.tint", "Ambient Tint", rgb(255, 255, 255), "Tints the backdrop"),
 	} },
+	{ title = "Ambiance", col = 2, rows = {
+		T("amb.override", "Override Time", false, "Force the time of day"),
+		S("amb.clock", "Clock Time", 0, 24, 14, "0 = midnight, 12 = noon", 0.5),
+	} },
 })
 
 buildPage("Character", {
@@ -2227,6 +2320,14 @@ buildPage("Character", {
 		S("char.speed", "Sway Speed", 0.5, 4, 1.5, "Sway speed", 0.1),
 		S("char.scale", "Model Scale", 60, 130, 100, "Preview model scale"),
 	} },
+	{ title = "Movement", col = 1, rows = {
+		T("mv.speed", "Speed", false, "Override WalkSpeed"),
+		S("mv.speedval", "Walk Speed", 16, 120, 40, "Studs / second"),
+		T("mv.fly", "Fly", false, "WASD + Space / LeftShift to move"),
+		S("mv.flyspeed", "Fly Speed", 10, 150, 50, "Studs / second"),
+		T("mv.infjump", "Infinite Jump", false, "Jump in mid-air"),
+		T("mv.bhop", "Bunny Hop", false, "Hold Space to keep hopping"),
+	} },
 })
 
 buildPage("Misc", {
@@ -2234,6 +2335,7 @@ buildPage("Misc", {
 		T("misc.notify", "Notifications", true, "Show toast messages"),
 		T("misc.tips", "Tooltips", true, "Show setting descriptions on hover"),
 		T("misc.compact", "Compact Mode", false, "Tighter row spacing"),
+		T("misc.antiafk", "Anti-AFK", false, "Stops the idle timeout from kicking you"),
 		B("Test Notification", "Send", function() notify("Lilac", "Notifications are working.") end, "Fire a test toast"),
 	} },
 	{ title = "Config", col = 2, rows = {
@@ -2255,7 +2357,7 @@ buildPage("Misc", {
 
 buildPage("Settings", {
 	{ title = "Menu", col = 1, rows = {
-		{ type = "keybind", key = "set.menukey", name = "Menu Key", default = Enum.KeyCode.RightShift, tip = "Show / hide the window" },
+		{ type = "keybind", key = "set.menukey", name = "Menu Key", default = "RightShift", tip = "Show / hide the window" },
 		S("set.scale", "Interface Scale", 70, 120, 100, "Window scale (%)"),
 		T("set.preview", "Show Live Preview", true, "Show the preview panel"),
 		T("set.lock", "Lock Window", false, "Disable dragging"),
@@ -2389,12 +2491,12 @@ end)
 closeButton.MouseButton1Click:Connect(unload)
 
 -- menu key
-connect(UserInputService.InputBegan, function(i, processed)
-	if processed or _G.__LilacBinding then return end
+connect(UserInputService.InputBegan, function(i)
+	if _G.__LilacBinding or UserInputService:GetFocusedTextBox() then return end
 	if os.clock() - (_G.__LilacBindTime or 0) < 0.3 then return end
-	local k = Settings["set.menukey"]
-	if k and k ~= Enum.KeyCode.Unknown and i.KeyCode == k then
+	if matchesBind(i, Settings["set.menukey"]) then
 		root.Visible = not root.Visible
+		modalBtn.Modal = root.Visible
 		closePopup()
 	end
 end)
@@ -2458,6 +2560,600 @@ connect(RunService.Heartbeat, function(dt)
 end)
 
 --------------------------------------------------------------------------
+-- features (act on real players in your test game)
+--------------------------------------------------------------------------
+do -- features scope
+local lp = player
+local cam = workspace.CurrentCamera
+connect(workspace:GetPropertyChangedSignal("CurrentCamera"), function() cam = workspace.CurrentCamera end)
+
+local worldLayer = create("Frame", {
+	Name = "World",
+	BackgroundTransparency = 1,
+	Size = UDim2.fromScale(1, 1),
+	ZIndex = 0,
+	Active = false,
+}, gui)
+
+local function myChar() return lp.Character end
+local function myHum()
+	local c = myChar()
+	return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function myRoot()
+	local c = myChar()
+	return c and c:FindFirstChild("HumanoidRootPart")
+end
+local function sameTeam(plr)
+	return lp.Team ~= nil and plr.Team == lp.Team
+end
+local function alive(plr)
+	local c = plr.Character
+	local h = c and c:FindFirstChildOfClass("Humanoid")
+	return c, h, (h and h.Health > 0)
+end
+local function typing() return UserInputService:GetFocusedTextBox() ~= nil end
+
+local toggled = { aim = false, trig = false }
+local function modeActive(p)
+	local mode = Settings[p .. ".mode"]
+	if mode == "Always" then return true end
+	if mode == "Toggle" then return toggled[p] end
+	return bindDown(Settings[p .. ".key"])
+end
+connect(UserInputService.InputBegan, function(i)
+	if _G.__LilacBinding or typing() then return end
+	for p in pairs(toggled) do
+		if Settings[p .. ".mode"] == "Toggle" and matchesBind(i, Settings[p .. ".key"]) then
+			toggled[p] = not toggled[p]
+		end
+	end
+end)
+
+local function targetOk(plr, c, hum, p)
+	if not hum or hum.Health <= 0 then return false end
+	if Settings[p .. ".team"] and sameTeam(plr) then return false end
+	if Settings[p .. ".hpcheck"] then
+		if c:FindFirstChildOfClass("ForceField") then return false end
+		if p == "aim" and hum.Health / math.max(hum.MaxHealth, 1) * 100 < Settings["aim.minhp"] then return false end
+	end
+	return true
+end
+
+-- ESP -------------------------------------------------------------------
+local espObjs = {}
+
+local BONES_R15 = {
+	{ "Head", "UpperTorso", 1 }, { "UpperTorso", "LowerTorso", 1 },
+	{ "UpperTorso", "LeftUpperArm", 2 }, { "LeftUpperArm", "LeftLowerArm", 2 }, { "LeftLowerArm", "LeftHand", 2 },
+	{ "UpperTorso", "RightUpperArm", 2 }, { "RightUpperArm", "RightLowerArm", 2 }, { "RightLowerArm", "RightHand", 2 },
+	{ "LowerTorso", "LeftUpperLeg", 3 }, { "LeftUpperLeg", "LeftLowerLeg", 3 }, { "LeftLowerLeg", "LeftFoot", 3 },
+	{ "LowerTorso", "RightUpperLeg", 3 }, { "RightUpperLeg", "RightLowerLeg", 3 }, { "RightLowerLeg", "RightFoot", 3 },
+}
+local BONES_R6 = {
+	{ "Head", "Torso", 1 }, { "Torso", "Left Arm", 2 }, { "Torso", "Right Arm", 2 },
+	{ "Torso", "Left Leg", 3 }, { "Torso", "Right Leg", 3 },
+}
+
+local function lineBetween(f, a, b, th, col)
+	local d = b - a
+	f.Position = UDim2.fromOffset((a.X + b.X) / 2, (a.Y + b.Y) / 2)
+	f.Size = UDim2.fromOffset(d.Magnitude, th)
+	f.Rotation = math.deg(math.atan2(d.Y, d.X))
+	f.BackgroundColor3 = col
+end
+
+local function destroyEsp(o)
+	if not o then return end
+	for _, k in ipairs({ "hl", "bb", "tracer", "lookLine", "lookDot", "arrow" }) do
+		if o[k] then o[k]:Destroy() end
+	end
+	for _, f in pairs(o.headM or {}) do
+		if typeof(f) == "Instance" then f:Destroy() end
+	end
+	for _, f in ipairs(o.bones or {}) do f:Destroy() end
+end
+
+local function buildEsp(plr, char)
+	local rootPart = char:FindFirstChild("HumanoidRootPart")
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not rootPart or not hum then return nil end
+	local o = { char = char, root = rootPart, hum = hum }
+	o.hl = create("Highlight", {
+		Adornee = char, DepthMode = Enum.HighlightDepthMode.AlwaysOnTop, Enabled = false,
+	}, char)
+	o.bb = create("BillboardGui", {
+		Adornee = rootPart, AlwaysOnTop = true, LightInfluence = 0, ResetOnSpawn = false,
+		Size = UDim2.fromScale(4.5, 6.2),
+	}, char)
+	o.box = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0 }, o.bb)
+	o.boxStroke = stroke(o.box, Color3.new(1, 1, 1), 1)
+	o.corners = {}
+	for _, a in ipairs({ { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 } }) do
+		for _, h in ipairs({ true, false }) do
+			local f = create("Frame", {
+				BorderSizePixel = 0, AnchorPoint = Vector2.new(a[1], a[2]),
+				Position = UDim2.fromScale(a[1], a[2]), Visible = false,
+			}, o.bb)
+			table.insert(o.corners, { f = f, h = h })
+		end
+	end
+	o.hpBack = create("Frame", { BackgroundColor3 = Color3.fromRGB(10, 8, 12), BorderSizePixel = 0 }, o.bb)
+	o.hpFill = create("Frame", {
+		AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), BorderSizePixel = 0,
+	}, o.hpBack)
+	o.hpGrad = create("UIGradient", { Rotation = 90, Enabled = false }, o.hpFill)
+	local function lbl()
+		return create("TextLabel", {
+			BackgroundTransparency = 1, Text = "", TextColor3 = Color3.new(1, 1, 1),
+			TextStrokeColor3 = Color3.new(0, 0, 0),
+		}, o.bb)
+	end
+	o.name = lbl()
+	o.name.AnchorPoint = Vector2.new(0.5, 1)
+	o.name.Position = UDim2.new(0.5, 0, 0, -2)
+	o.hpTxt = lbl()
+	o.hpTxt.AnchorPoint = Vector2.new(1, 0.5)
+	o.hpTxt.TextXAlignment = Enum.TextXAlignment.Right
+	o.info = create("Frame", {
+		BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, 2),
+		Size = UDim2.fromOffset(220, 0), AutomaticSize = Enum.AutomaticSize.Y,
+	}, o.bb)
+	create("UIListLayout", { HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, o.info)
+	o.weapon, o.ammo, o.dist = lbl(), lbl(), lbl()
+	for i, l in ipairs({ o.weapon, o.ammo, o.dist }) do l.Parent = o.info; l.LayoutOrder = i end
+	o.tracer = create("Frame", {
+		BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0,
+		AnchorPoint = Vector2.new(0.5, 0.5), Visible = false,
+	}, worldLayer)
+	local function sq()
+		return create("Frame", { BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Visible = false }, worldLayer)
+	end
+	o.bones = {}
+	o.headM = { h = sq(), v = sq(), circle = sq(), square = sq() }
+	round(o.headM.circle)
+	corner(o.headM.square, 1)
+	o.headM.circleStroke = stroke(o.headM.circle, Color3.new(1, 1, 1), 1)
+	o.headM.squareStroke = stroke(o.headM.square, Color3.new(1, 1, 1), 1)
+	o.lookLine = sq()
+	o.lookDot = sq()
+	o.lookDot.Size = UDim2.fromOffset(6, 6)
+	round(o.lookDot)
+	o.arrow = sq()
+	o.arrow.Size = UDim2.fromOffset(11, 11)
+	o.arrow.Rotation = 45
+	corner(o.arrow, 2)
+	return o
+end
+
+local function hideEsp(o)
+	o.hl.Enabled = false
+	o.bb.Enabled = false
+	o.tracer.Visible = false
+	o.lookLine.Visible = false
+	o.lookDot.Visible = false
+	o.arrow.Visible = false
+	for _, f in pairs(o.headM) do
+		if typeof(f) == "Instance" and f:IsA("GuiObject") then f.Visible = false end
+	end
+	for _, f in ipairs(o.bones) do f.Visible = false end
+end
+
+local function updateEsp(plr, o, t)
+	local S = Settings
+	local d = (cam.CFrame.Position - o.root.Position).Magnitude
+	o.bb.Enabled = true
+	-- chams
+	o.hl.Enabled = S["esp.highlight"]
+	o.hl.FillColor = S["cham.fill"]
+	o.hl.FillTransparency = 1 - S["cham.opacity"] / 100
+	o.hl.OutlineColor = S["cham.outline"]
+	o.hl.OutlineTransparency = S["cham.pulse"] and (0.45 + 0.35 * math.sin(t * 3)) or 0
+	-- box
+	local th = S["bars.boxthick"]
+	local asCorners = S["bars.boxstyle"] == "Corners"
+	o.box.Visible = S["esp.box"]
+	o.boxStroke.Enabled = not asCorners
+	o.boxStroke.Thickness = th
+	o.boxStroke.Color = S["bars.boxcolor"]
+	o.box.BackgroundColor3 = S["bars.fillcolor"]
+	o.box.BackgroundTransparency = S["bars.fillbox"] and (1 - S["bars.fillopacity"] / 100) or 1
+	for _, c in ipairs(o.corners) do
+		c.f.Visible = S["esp.box"] and asCorners
+		c.f.BackgroundColor3 = S["bars.boxcolor"]
+		c.f.Size = c.h and UDim2.fromOffset(14, th) or UDim2.fromOffset(th, 14)
+	end
+	-- text
+	local font, ts = FontMap[S["fmt.font"]] or BODY, S["fmt.size"]
+	local tst = S["fmt.outline"] and 0.35 or 1
+	for _, l in ipairs({ o.name, o.hpTxt, o.weapon, o.ammo, o.dist }) do
+		l.Font, l.TextSize, l.TextColor3, l.TextStrokeTransparency = font, ts, S["fmt.color"], tst
+	end
+	o.name.Visible = S["esp.names"]
+	o.name.Text = plr.DisplayName .. ((S["esp.team"] and sameTeam(plr)) and "  [TEAM]" or "")
+	o.name.Size = UDim2.fromOffset(220, ts + 6)
+	local tool = o.char:FindFirstChildOfClass("Tool")
+	o.weapon.Visible = S["esp.weapon"]
+	o.weapon.Text = tool and tool.Name or "None"
+	o.ammo.Visible = S["esp.ammo"]
+	o.ammo.Text = tool and tostring(tool:GetAttribute("Ammo") or "-") or "-"
+	o.dist.Visible = S["esp.distance"]
+	o.dist.Text = S["fmt.unit"] == "Meters" and string.format("%d m", math.floor(d * 0.28 + 0.5)) or string.format("%d studs", math.floor(d + 0.5))
+	for _, l in ipairs({ o.weapon, o.ammo, o.dist }) do l.Size = UDim2.new(1, 0, 0, ts + 4) end
+	-- health
+	local hp = math.clamp(o.hum.Health / math.max(o.hum.MaxHealth, 1), 0, 1)
+	local bw = S["bars.width"]
+	local col = S["bars.low"]:Lerp(S["bars.high"], hp)
+	o.hpBack.Visible = S["esp.vhealth"]
+	o.hpBack.Size = UDim2.new(0, bw, 1, 0)
+	o.hpBack.Position = UDim2.new(0, -4 - bw, 0, 0)
+	o.hpFill.Size = UDim2.fromScale(1, hp)
+	o.hpGrad.Enabled = S["bars.gradient"]
+	o.hpGrad.Color = ColorSequence.new(S["bars.high"], S["bars.low"])
+	o.hpFill.BackgroundColor3 = S["bars.gradient"] and Color3.new(1, 1, 1) or col
+	o.hpTxt.Visible = S["esp.healthinfo"]
+	o.hpTxt.Text = tostring(math.floor(o.hum.Health))
+	o.hpTxt.TextColor3 = col
+	o.hpTxt.Size = UDim2.fromOffset(34, ts + 2)
+	o.hpTxt.Position = UDim2.new(0, -8 - (S["esp.vhealth"] and bw or 0), 1 - hp, 0)
+	-- tracer
+	if S["tr.enabled"] then
+		local v, on = cam:WorldToViewportPoint(o.root.Position - Vector3.new(0, 3, 0))
+		if on then
+			local vs = cam.ViewportSize
+			local origin = Vector2.new(vs.X / 2, vs.Y)
+			if S["tr.origin"] == "Center" then origin = vs / 2 elseif S["tr.origin"] == "Top" then origin = Vector2.new(vs.X / 2, 0) end
+			local to = Vector2.new(v.X, v.Y)
+			local diff = to - origin
+			o.tracer.Visible = true
+			o.tracer.Position = UDim2.fromOffset((origin.X + to.X) / 2, (origin.Y + to.Y) / 2)
+			o.tracer.Size = UDim2.fromOffset(diff.Magnitude, S["tr.thick"])
+			o.tracer.Rotation = math.deg(math.atan2(diff.Y, diff.X))
+			o.tracer.BackgroundColor3 = S["tr.color"]
+		else
+			o.tracer.Visible = false
+		end
+	else
+		o.tracer.Visible = false
+	end
+
+	-- skeleton
+	local sk = S["skel.enabled"]
+	local list = o.char:FindFirstChild("UpperTorso") and BONES_R15 or BONES_R6
+	local cols = { S["skel.c1"], S["skel.c2"], S["skel.c3"] }
+	for idx, b in ipairs(list) do
+		local fr = o.bones[idx]
+		if not fr then
+			fr = create("Frame", { BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Visible = false }, worldLayer)
+			o.bones[idx] = fr
+		end
+		local p1, p2 = o.char:FindFirstChild(b[1]), o.char:FindFirstChild(b[2])
+		if sk and p1 and p2 then
+			local a = cam:WorldToViewportPoint(p1.Position)
+			local c2 = cam:WorldToViewportPoint(p2.Position)
+			if a.Z > 0 and c2.Z > 0 then
+				lineBetween(fr, Vector2.new(a.X, a.Y), Vector2.new(c2.X, c2.Y), S["skel.thick"], cols[b[3]])
+				fr.Visible = true
+			else
+				fr.Visible = false
+			end
+		else
+			fr.Visible = false
+		end
+	end
+	for idx = #list + 1, #o.bones do o.bones[idx].Visible = false end
+
+	-- head marker
+	local M = o.headM
+	local headPart = o.char:FindFirstChild("Head")
+	local showHead = false
+	if S["head.enabled"] and headPart then
+		local v = cam:WorldToViewportPoint(headPart.Position)
+		if v.Z > 0 then
+			showHead = true
+			local px = 4 + S["head.size"] * 2.2
+			local ht, hc, shape, fillOn = S["head.thick"], S["head.color"], S["head.shape"], S["head.fill"]
+			local pos = UDim2.fromOffset(v.X, v.Y)
+			M.h.Position, M.v.Position, M.circle.Position, M.square.Position = pos, pos, pos, pos
+			M.h.Visible, M.v.Visible = shape == "Cross", shape == "Cross"
+			M.h.BackgroundColor3, M.v.BackgroundColor3 = hc, hc
+			M.h.Size, M.v.Size = UDim2.fromOffset(px, ht), UDim2.fromOffset(ht, px)
+			M.circle.Visible = shape == "Circle"
+			M.circle.Size = UDim2.fromOffset(px, px)
+			M.circle.BackgroundColor3 = hc
+			M.circle.BackgroundTransparency = fillOn and 0 or 1
+			M.circleStroke.Thickness, M.circleStroke.Color = ht, hc
+			M.square.Visible = shape == "Square"
+			M.square.Size = UDim2.fromOffset(px, px)
+			M.square.BackgroundColor3 = hc
+			M.square.BackgroundTransparency = fillOn and 0 or 1
+			M.squareStroke.Thickness, M.squareStroke.Color = ht, hc
+		end
+	end
+	if not showHead then
+		M.h.Visible, M.v.Visible, M.circle.Visible, M.square.Visible = false, false, false, false
+	end
+
+	-- look direction
+	local lookShown = false
+	if S["esp.look"] and headPart then
+		local a = cam:WorldToViewportPoint(headPart.Position)
+		local b = cam:WorldToViewportPoint(headPart.Position + headPart.CFrame.LookVector * 4)
+		if a.Z > 0 and b.Z > 0 then
+			lookShown = true
+			lineBetween(o.lookLine, Vector2.new(a.X, a.Y), Vector2.new(b.X, b.Y), 1.5, Theme.Accent)
+			o.lookDot.Position = UDim2.fromOffset(b.X, b.Y)
+			o.lookDot.BackgroundColor3 = Theme.Accent
+		end
+	end
+	o.lookLine.Visible, o.lookDot.Visible = lookShown, lookShown
+
+	-- off-screen arrow
+	local rv = cam:WorldToViewportPoint(o.root.Position)
+	local offscreen = false
+	if S["esp.arrows"] then
+		local vs = cam.ViewportSize
+		offscreen = rv.Z <= 0 or rv.X < 0 or rv.Y < 0 or rv.X > vs.X or rv.Y > vs.Y
+		if offscreen then
+			local center = vs / 2
+			local dir = Vector2.new(rv.X, rv.Y) - center
+			if rv.Z <= 0 then dir = -dir end
+			if dir.Magnitude < 1 then dir = Vector2.new(0, 1) end
+			dir = dir.Unit
+			local sc = math.min((vs.X / 2 - 30) / math.max(math.abs(dir.X), 1e-3), (vs.Y / 2 - 30) / math.max(math.abs(dir.Y), 1e-3))
+			local p = center + dir * sc
+			o.arrow.Position = UDim2.fromOffset(p.X, p.Y)
+			o.arrow.BackgroundColor3 = Theme.Accent
+		end
+	end
+	o.arrow.Visible = offscreen
+end
+
+-- targeting -------------------------------------------------------------
+local function boneParts(c, mode)
+	local head = c:FindFirstChild("Head")
+	local torso = c:FindFirstChild("UpperTorso") or c:FindFirstChild("Torso") or c:FindFirstChild("HumanoidRootPart")
+	if mode == "Head" then return { head } elseif mode == "Torso" then return { torso } end
+	return { head, torso }
+end
+
+local function visibleFrom(part, c)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { myChar(), c }
+	local origin = cam.CFrame.Position
+	return workspace:Raycast(origin, part.Position - origin, params) == nil
+end
+
+local function bestTarget()
+	local S = Settings
+	local m = UserInputService:GetMouseLocation()
+	local best, bestD = nil, S["fov.size"]
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= lp then
+			local c, hum, ok = alive(plr)
+			if ok and targetOk(plr, c, hum, "aim") then
+				for _, part in ipairs(boneParts(c, S["aim.bone"])) do
+					local v, on = cam:WorldToViewportPoint(part.Position)
+					if on then
+						local dist = (Vector2.new(v.X, v.Y) - m).Magnitude
+						if dist < bestD and (not S["aim.wall"] or visibleFrom(part, c)) then
+							best, bestD = part, dist
+						end
+					end
+				end
+			end
+		end
+	end
+	return best
+end
+
+-- FOV circle
+local fovCircle = create("Frame", {
+	BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Visible = false,
+}, worldLayer)
+round(fovCircle)
+local fovStroke = stroke(fovCircle, Color3.new(1, 1, 1), 1.5)
+
+-- aim + trigger run after the default camera script
+local trigBusy = false
+RunService:BindToRenderStep("LilacAim", Enum.RenderPriority.Camera.Value + 1, function()
+	local S = Settings
+	local m = UserInputService:GetMouseLocation()
+	fovCircle.Visible = S["aim.enabled"] and S["fov.draw"] and root.Visible
+	fovCircle.Position = UDim2.fromOffset(m.X, m.Y)
+	fovCircle.Size = UDim2.fromOffset(S["fov.size"] * 2, S["fov.size"] * 2)
+	fovStroke.Color = S["fov.color"]
+
+	if S["aim.enabled"] and not typing() and modeActive("aim") then
+		local target = bestTarget()
+		if target then
+			local goal = CFrame.new(cam.CFrame.Position, target.Position)
+			cam.CFrame = cam.CFrame:Lerp(goal, math.clamp(1 / S["aim.smooth"], 0, 1))
+		end
+	end
+
+	if S["trig.enabled"] and not trigBusy and not typing() and modeActive("trig") then
+		local ray = cam:ViewportPointToRay(m.X, m.Y)
+		local params = RaycastParams.new()
+		if S["trig.wall"] then
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = { myChar() }
+		else
+			local list = {}
+			for _, pl in ipairs(Players:GetPlayers()) do
+				if pl ~= lp and pl.Character then table.insert(list, pl.Character) end
+			end
+			params.FilterType = Enum.RaycastFilterType.Include
+			params.FilterDescendantsInstances = list
+		end
+		local hit = workspace:Raycast(ray.Origin, ray.Direction * 1000, params)
+		local plr = hit and Players:GetPlayerFromCharacter(hit.Instance:FindFirstAncestorOfClass("Model"))
+		if plr and plr ~= lp then
+			local c, hum, ok = alive(plr)
+			local tool = myChar() and myChar():FindFirstChildOfClass("Tool")
+			if ok and tool and targetOk(plr, c, hum, "trig") then
+				trigBusy = true
+				task.delay(S["trig.delay"] / 1000, function()
+					if tool.Parent then tool:Activate() end
+					task.wait(0.1)
+					trigBusy = false
+				end)
+			end
+		end
+	end
+end)
+table.insert(cleanups, function() RunService:UnbindFromRenderStep("LilacAim") end)
+
+-- hitbox expander (client-side only) ---------------------------------------
+local origSizes = {}
+local function restoreHitboxes()
+	for part, o in pairs(origSizes) do
+		if part.Parent then part.Size, part.Transparency, part.CanCollide = o.size, o.trans, o.collide end
+	end
+	table.clear(origSizes)
+end
+table.insert(cleanups, restoreHitboxes)
+
+-- movement -----------------------------------------------------------------
+local savedSpeed, flyVel
+local function stopFly()
+	if flyVel then flyVel:Destroy(); flyVel = nil end
+end
+table.insert(cleanups, stopFly)
+table.insert(cleanups, function()
+	local h = myHum()
+	if h and savedSpeed then h.WalkSpeed = savedSpeed end
+end)
+
+connect(UserInputService.JumpRequest, function()
+	if Settings["mv.infjump"] then
+		local h = myHum()
+		if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+	end
+end)
+
+-- ambiance ------------------------------------------------------------------
+local origClock = Lighting.ClockTime
+local ambOn = false
+table.insert(cleanups, function() if ambOn then Lighting.ClockTime = origClock end end)
+
+-- anti-afk (own game only) ----------------------------------------------------
+connect(lp.Idled, function()
+	if Settings["misc.antiafk"] then
+		local ok, vu = pcall(function() return game:GetService("VirtualUser") end)
+		if ok and vu then
+			vu:CaptureController()
+			vu:ClickButton2(Vector2.new())
+		end
+	end
+end)
+
+-- main feature loop ------------------------------------------------------------
+connect(RunService.Heartbeat, function()
+	local S = Settings
+	local t = os.clock()
+
+	-- ESP
+	local want = S["live.esp"] and S["esp.enabled"]
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= lp then
+			local o = espObjs[plr]
+			local c, _, ok = alive(plr)
+			if o and o.char ~= c then destroyEsp(o); o = nil; espObjs[plr] = nil end
+			if want and c and ok then
+				if not o then o = buildEsp(plr, c); espObjs[plr] = o end
+				if o then
+					if sameTeam(plr) and not S["esp.team"] then
+						hideEsp(o)
+					else
+						local okU, errU = pcall(updateEsp, plr, o, t)
+						if not okU and not _G.__LilacEspWarned then
+							_G.__LilacEspWarned = true
+							warn("[Lilac] ESP error: " .. tostring(errU))
+						end
+					end
+				end
+			elseif o then
+				hideEsp(o)
+			end
+		end
+	end
+	for plr, o in pairs(espObjs) do
+		if not plr.Parent then destroyEsp(o); espObjs[plr] = nil end
+	end
+
+	-- hitboxes
+	if S["hb.enabled"] then
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr ~= lp and not sameTeam(plr) then
+				local c, _, ok = alive(plr)
+				local r = c and c:FindFirstChild("HumanoidRootPart")
+				if r and ok then
+					origSizes[r] = origSizes[r] or { size = r.Size, trans = r.Transparency, collide = r.CanCollide }
+					r.Size = Vector3.new(S["hb.size"], S["hb.size"], S["hb.size"])
+					r.Transparency, r.CanCollide = 0.7, false
+				end
+			end
+		end
+	elseif next(origSizes) then
+		restoreHitboxes()
+	end
+
+	-- speed
+	local hum, rootPart = myHum(), myRoot()
+	if hum then
+		if S["mv.speed"] then
+			savedSpeed = savedSpeed or hum.WalkSpeed
+			hum.WalkSpeed = S["mv.speedval"]
+		elseif savedSpeed then
+			hum.WalkSpeed = savedSpeed
+			savedSpeed = nil
+		end
+		if S["mv.bhop"] and not typing() and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+			hum.Jump = true
+		end
+	end
+
+	-- fly
+	if S["mv.fly"] and rootPart and hum then
+		if not flyVel or flyVel.Parent ~= rootPart then
+			stopFly()
+			flyVel = create("BodyVelocity", { MaxForce = Vector3.new(1e5, 1e5, 1e5), Velocity = Vector3.zero }, rootPart)
+		end
+		local dir = Vector3.zero
+		if not typing() then
+			local cf = cam.CFrame
+			if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cf.LookVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cf.LookVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cf.RightVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cf.RightVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.yAxis end
+			if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.yAxis end
+		end
+		flyVel.Velocity = dir.Magnitude > 0 and dir.Unit * S["mv.flyspeed"] or Vector3.zero
+	else
+		stopFly()
+	end
+
+	-- ambiance
+	if S["amb.override"] then
+		if not ambOn then origClock = Lighting.ClockTime; ambOn = true end
+		Lighting.ClockTime = S["amb.clock"]
+	elseif ambOn then
+		Lighting.ClockTime = origClock
+		ambOn = false
+	end
+end)
+
+table.insert(cleanups, function()
+	for _, o in pairs(espObjs) do destroyEsp(o) end
+	table.clear(espObjs)
+end)
+
+end -- features scope
+
+--------------------------------------------------------------------------
 -- go
 --------------------------------------------------------------------------
 bulk = true
@@ -2466,4 +3162,5 @@ bulk = false
 renderPreview()
 updatePreviewVisible()
 selectTab("ESP")
-notify("Lilac loaded", "Press " .. Settings["set.menukey"].Name .. " to hide or show.")
+print("[Lilac] loaded")
+notify("Lilac loaded", "Press " .. Settings["set.menukey"] .. " to hide or show.")
