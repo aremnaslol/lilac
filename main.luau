@@ -450,7 +450,7 @@ local sidebar = create("Frame", {
 	Size = UDim2.new(0, SIDEBAR_W, 1, 0),
 	BorderSizePixel = 0,
 }, main)
-local sideLine = create("Frame", {
+create("Frame", {
 	BackgroundColor3 = Theme.Border,
 	BackgroundTransparency = 0.4,
 	BorderSizePixel = 0,
@@ -594,7 +594,7 @@ local function windowButton(offsetX, kind)
 		}, b)
 		table.insert(bars, f)
 	end
-	if kind == "close" then bar(45) bar(-45) else bar(0) end
+	if kind == "close" then bar(45); bar(-45) else bar(0) end
 	b.MouseEnter:Connect(function()
 		tween(b, { BackgroundTransparency = 0 }, 0.1)
 		for _, f in ipairs(bars) do f.BackgroundColor3 = Theme.Text end
@@ -667,7 +667,7 @@ local catcher = create("TextButton", {
 local popup
 local popupConns = {}
 local function closePopup()
-	if popup then popup:Destroy() popup = nil end
+	if popup then popup:Destroy(); popup = nil end
 	catcher.Visible = false
 	for _, c in ipairs(popupConns) do c:Disconnect() end
 	table.clear(popupConns)
@@ -1244,7 +1244,6 @@ end
 local arrowR, arrowT, arrowL = arrow(SW - 16, 130, 45), arrow(SW / 2 + 40, 20, 45), arrow(16, 400, 45)
 
 -- crosshair + hit marker
-local cxL, cxR, cxT, cxB = {}, {}, {}, {}
 local crossBars = {}
 for i = 1, 4 do
 	crossBars[i] = create("Frame", { BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 8 }, screen)
@@ -1957,7 +1956,7 @@ local function buildCard(col, def)
 		Position = UDim2.new(1, -8, 0.5, 0),
 		Size = UDim2.fromOffset(28, 28),
 	}, header)
-	local h1 = create("Frame", {
+	create("Frame", {
 		BackgroundColor3 = Theme.Muted,
 		BorderSizePixel = 0,
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -2358,8 +2357,8 @@ bindAccent(styleNav)
 --------------------------------------------------------------------------
 -- handlers
 --------------------------------------------------------------------------
-Handlers["vis.accent"] = function(c) Theme.Accent = c refreshAccent() end
-Handlers["vis.accent2"] = function(c) Theme.Accent2 = c refreshAccent() end
+Handlers["vis.accent"] = function(c) Theme.Accent = c; refreshAccent() end
+Handlers["vis.accent2"] = function(c) Theme.Accent2 = c; refreshAccent() end
 Handlers["vis.preset"] = function(v)
 	if bulk then return end
 	local p = Presets[v]
@@ -2378,7 +2377,7 @@ Handlers["misc.compact"] = function(v)
 		r.frame.Size = UDim2.new(1, 0, 0, r.base - (v and 6 or 0))
 	end
 end
-Handlers["set.scale"] = function(v) userScale = v / 100 fit() end
+Handlers["set.scale"] = function(v) userScale = v / 100; fit() end
 Handlers["set.preview"] = function() updatePreviewVisible() end
 
 -- minimize / close
