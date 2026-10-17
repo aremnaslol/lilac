@@ -1,13 +1,3 @@
---[[
-	LILAC v2 — interface
-	Two-column cards, sub-tabs, HSV color picker, dropdown popups, keybinds,
-	tooltips, toasts, config export/import and a fully reactive live preview.
-
-	Everything here is interface + preview logic. Nothing touches other
-	players or the game world; the ESP / combat toggles drive the preview.
-	Menu key: RightShift (rebindable in Settings).
-]]
-
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
