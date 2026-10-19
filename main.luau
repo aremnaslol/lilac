@@ -60,9 +60,21 @@ _G.__LilacCleanup = unload
 --------------------------------------------------------------------------
 -- constants / theme
 --------------------------------------------------------------------------
+-- platform: "PC", "Mobile" or "Console". Override with _G.LilacPlatform = "Mobile" before running (handy for Studio testing).
+local function detectPlatform()
+	if _G.LilacPlatform then return _G.LilacPlatform end
+	local U = UserInputService
+	if U.TouchEnabled and not U.KeyboardEnabled then return "Mobile" end
+	if U.GamepadEnabled and not U.KeyboardEnabled and not U.MouseEnabled and not U.TouchEnabled then return "Console" end
+	return "PC"
+end
+local platform = detectPlatform()
+local isMobile = platform == "Mobile"
+
 local RW, RH = 1360, 650
 local MAIN_W = 1080
 local SIDEBAR_W = 200
+if isMobile then RW, RH, MAIN_W, SIDEBAR_W = 820, 400, 820, 150 end
 local PREVIEW_W = 260
 local CONTENT_W = MAIN_W - SIDEBAR_W
 
@@ -215,10 +227,15 @@ local function isMove(i)
 		or i.UserInputType == Enum.UserInputType.Touch
 end
 
+local function lastInputIsPad()
+	return UserInputService:GetLastInputType().Name:sub(1, 7) == "Gamepad"
+end
+
 local function matchesBind(i, name)
 	if not name then return false end
-	if i.UserInputType == Enum.UserInputType.Keyboard then return i.KeyCode.Name == name end
-	return i.UserInputType.Name == name
+	local ut = i.UserInputType
+	if ut == Enum.UserInputType.Keyboard or ut.Name:sub(1, 7) == "Gamepad" then return i.KeyCode.Name == name end
+	return ut.Name == name
 end
 
 local keyEnumCache = {}
@@ -234,7 +251,10 @@ local function bindDown(name)
 		kc = ok and v or false
 		keyEnumCache[name] = kc
 	end
-	return (kc and UserInputService:IsKeyDown(kc)) or false
+	if not kc then return false end
+	if UserInputService:IsKeyDown(kc) then return true end
+	local okG, down = pcall(UserInputService.IsGamepadButtonDown, UserInputService, Enum.UserInputType.Gamepad1, kc)
+	return (okG and down) or false
 end
 
 local accentBinds = {}
@@ -395,7 +415,18 @@ local root = create("Frame", {
 	BackgroundTransparency = 1,
 }, gui)
 
-local modalBtn = create("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0), Modal = true }, gui)
+local dim = create("TextButton", {
+	Name = "Dim",
+	Selectable = false,
+	Text = "",
+	AutoButtonColor = false,
+	BackgroundColor3 = Color3.new(0, 0, 0),
+	BackgroundTransparency = 0.45,
+	BorderSizePixel = 0,
+	Size = UDim2.fromScale(1, 1),
+	ZIndex = 0,
+	Modal = true,
+}, gui)
 local uiScale = create("UIScale", {}, root)
 local userScale = 1
 local function fit()
@@ -516,12 +547,16 @@ local brandSub = text(sidebar, "PRIVATE BUILD  ·  v2.0", 8, Theme.Muted, LIGHT)
 brandSub.Position = UDim2.fromOffset(63, 36)
 brandSub.Size = UDim2.new(1, -70, 0, 14)
 
+local modulesLbl = text(sidebar, "MODULES", 9, Theme.Muted, BOLD)
+modulesLbl.Position = UDim2.fromOffset(20, 58)
+modulesLbl.Size = UDim2.new(1, -40, 0, 14)
+
 local navHolder = create("Frame", {
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(12, 78),
+	Position = UDim2.fromOffset(12, isMobile and 62 or 78),
 	Size = UDim2.new(1, -24, 0, 380),
 }, sidebar)
-create("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, navHolder)
+create("UIListLayout", { Padding = UDim.new(0, isMobile and 4 or 6), SortOrder = Enum.SortOrder.LayoutOrder }, navHolder)
 
 local profile = create("Frame", {
 	BackgroundColor3 = Theme.Card,
@@ -554,6 +589,7 @@ pName.TextTruncate = Enum.TextTruncate.AtEnd
 local pSub = text(profile, "Lilac Private", 10, Theme.Muted, LIGHT)
 pSub.Position = UDim2.fromOffset(56, 28)
 pSub.Size = UDim2.new(1, -62, 0, 14)
+if isMobile then profile.Visible = false; modulesLbl.Visible = false end
 
 --------------------------------------------------------------------------
 -- top bar (inside main so minimizing keeps it)
@@ -567,6 +603,23 @@ local dragBar = create("Frame", {
 local pageTitle = text(main, "ESP", 17, Theme.Text, HEAD)
 pageTitle.Position = UDim2.fromOffset(SIDEBAR_W + 22, 0)
 pageTitle.Size = UDim2.fromOffset(120, 56)
+local topLine = create("Frame", {
+	BackgroundColor3 = Theme.Accent,
+	BackgroundTransparency = 0.6,
+	BorderSizePixel = 0,
+	Position = UDim2.fromOffset(SIDEBAR_W, 55),
+	Size = UDim2.fromOffset(MAIN_W - SIDEBAR_W, 1),
+}, main)
+create("UIGradient", {
+	Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(0.6, 0.7), NumberSequenceKeypoint.new(1, 1),
+	}),
+}, topLine)
+bindAccent(function() topLine.BackgroundColor3 = Theme.Accent end)
+local fpsLabel = text(main, "", 10, Theme.Muted, BODY, Enum.TextXAlignment.Right)
+fpsLabel.Position = UDim2.new(1, -150, 0, 0)
+fpsLabel.Size = UDim2.fromOffset(90, 56)
+local fpsSmooth = 60
 
 local searchBox = create("TextBox", {
 	Name = "Search",
@@ -580,7 +633,7 @@ local searchBox = create("TextBox", {
 	TextXAlignment = Enum.TextXAlignment.Left,
 	BackgroundColor3 = Theme.Field,
 	Position = UDim2.fromOffset(SIDEBAR_W + 140, 12),
-	Size = UDim2.fromOffset(440, 32),
+	Size = UDim2.fromOffset(isMobile and 330 or 440, 32),
 	BorderSizePixel = 0,
 }, main)
 corner(searchBox, 10)
@@ -642,8 +695,7 @@ local function windowButton(offsetX, kind)
 	return b
 end
 
-local closeButton = windowButton(-44, "close")
-local minButton = windowButton(-78, "min")
+local minButton = windowButton(-44, "min")
 
 -- window dragging
 local drag = { active = false }
@@ -692,6 +744,7 @@ local overlay = create("Frame", {
 }, root)
 
 local catcher = create("TextButton", {
+	Selectable = false,
 	Text = "",
 	AutoButtonColor = false,
 	BackgroundTransparency = 1,
@@ -708,7 +761,7 @@ local function closePopup()
 	for _, c in ipairs(popupConns) do c:Disconnect() end
 	table.clear(popupConns)
 end
-catcher.MouseButton1Click:Connect(closePopup)
+catcher.Activated:Connect(closePopup)
 
 local function openPopup(anchor, size, build)
 	closePopup()
@@ -848,8 +901,8 @@ local function confirm(title, msg, yes)
 	local ok = makeButton(box, "Confirm", 100, 32, true)
 	ok.AnchorPoint = Vector2.new(1, 1)
 	ok.Position = UDim2.new(1, -20, 1, -16)
-	no.MouseButton1Click:Connect(function() dim:Destroy() end)
-	ok.MouseButton1Click:Connect(function()
+	no.Activated:Connect(function() dim:Destroy() end)
+	ok.Activated:Connect(function()
 		dim:Destroy()
 		yes()
 	end)
@@ -989,7 +1042,7 @@ local function openColorPicker(anchor, key)
 		}, pop)
 		round(q)
 		stroke(q, Theme.Border, 1)
-		q.MouseButton1Click:Connect(function()
+		q.Activated:Connect(function()
 			h, s, v = qc:ToHSV()
 			update()
 		end)
@@ -1281,17 +1334,7 @@ local function arrow(x, y, rot)
 end
 local arrowR, arrowT, arrowL = arrow(SW - 16, 130, 45), arrow(SW / 2 + 40, 20, 45), arrow(16, 400, 45)
 
--- crosshair + hit marker
-local crossBars = {}
-for i = 1, 4 do
-	crossBars[i] = create("Frame", { BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 8 }, screen)
-end
-local crossDot = create("Frame", { BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 8 }, screen)
-round(crossDot)
-local crossRing = create("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 8 }, screen)
-round(crossRing)
-local crossRingStroke = stroke(crossRing, Color3.new(1, 1, 1), 1)
-
+-- hit marker
 local hitBars = {}
 for i = 1, 4 do
 	hitBars[i] = create("Frame", {
@@ -1303,6 +1346,7 @@ for i = 1, 4 do
 	}, screen)
 end
 local hitCatcher = create("TextButton", {
+	Selectable = false,
 	Text = "",
 	AutoButtonColor = false,
 	BackgroundTransparency = 1,
@@ -1314,7 +1358,7 @@ hitHint.Position = UDim2.new(0, 0, 1, -18)
 hitHint.Size = UDim2.new(1, 0, 0, 12)
 
 local hitToken = 0
-hitCatcher.MouseButton1Click:Connect(function()
+hitCatcher.Activated:Connect(function()
 	if not Settings["hit.enabled"] then return end
 	hitToken += 1
 	local my = hitToken
@@ -1350,7 +1394,7 @@ function updatePreviewVisible()
 	preview.Visible = show
 	previewGlow.Visible = show
 end
-pvMin.MouseButton1Click:Connect(function()
+pvMin.Activated:Connect(function()
 	pvCollapsed = not pvCollapsed
 	screen.Visible = not pvCollapsed
 	local h = pvCollapsed and 46 or PH
@@ -1493,30 +1537,6 @@ function renderPreview()
 	if S["tr.origin"] == "Center" then oy = SH / 2 elseif S["tr.origin"] == "Top" then oy = 0 end
 	setLine(tracer, SW / 2, oy, SW / 2, feetY, S["tr.thick"], S["tr.color"])
 
-	-- crosshair
-	local cx, cy = SW / 2, SH / 2 + 6
-	local cOn, style = S["cross.enabled"], S["cross.style"]
-	local size, gap, ct, cc = S["cross.size"], S["cross.gap"], S["cross.thick"], S["cross.color"]
-	local showCross = cOn and style == "Cross"
-	local offs = {
-		{ cx - gap - size / 2, cy, size, ct }, { cx + gap + size / 2, cy, size, ct },
-		{ cx, cy - gap - size / 2, ct, size }, { cx, cy + gap + size / 2, ct, size },
-	}
-	for i, b in ipairs(crossBars) do
-		local o = offs[i]
-		b.Visible = showCross
-		b.BackgroundColor3 = cc
-		b.Position = UDim2.fromOffset(o[1], o[2])
-		b.Size = UDim2.fromOffset(o[3], o[4])
-	end
-	crossDot.Visible = cOn and (style == "Dot" or style == "Circle")
-	crossDot.BackgroundColor3 = cc
-	crossDot.Position = UDim2.fromOffset(cx, cy)
-	crossDot.Size = UDim2.fromOffset(ct + 2, ct + 2)
-	crossRing.Visible = cOn and style == "Circle"
-	crossRing.Position = UDim2.fromOffset(cx, cy)
-	crossRing.Size = UDim2.fromOffset((gap + size) * 2, (gap + size) * 2)
-	crossRingStroke.Thickness, crossRingStroke.Color = ct, cc
 end
 
 end -- preview scope
@@ -1524,6 +1544,7 @@ end -- preview scope
 --------------------------------------------------------------------------
 -- rows
 --------------------------------------------------------------------------
+local sliderNudge = {}
 local allRows = {}
 local cardFrames = {}
 local buildingKeys
@@ -1611,7 +1632,7 @@ local function makeRow(body, def)
 			knob.Position = Settings[key] and UDim2.new(1, -17, 0.5, 0) or UDim2.new(0, 3, 0.5, 0)
 			glow.Transparency = Settings[key] and 0.72 or 1
 		end)
-		track.MouseButton1Click:Connect(function()
+		track.Activated:Connect(function()
 			local v = not Settings[key]
 			render(v)
 			commit(key, v)
@@ -1697,6 +1718,11 @@ local function makeRow(body, def)
 				commit(key, v)
 			end
 		end)
+		sliderNudge[hit] = function(dir)
+			local v = snap(Settings[key] + dir * math.max(step, (mx - mn) * 0.05))
+			render(v)
+			commit(key, v)
+		end
 		connect(box.FocusLost, function()
 			local n = tonumber(box.Text)
 			if n then
@@ -1721,13 +1747,15 @@ local function makeRow(body, def)
 			BorderSizePixel = 0,
 		}, row)
 		corner(btn, 8)
-		stroke(btn, Theme.Border, 1)
+		local btnStroke = stroke(btn, Theme.Border, 1)
+		btn.MouseEnter:Connect(function() tween(btnStroke, { Color = Theme.Accent }, 0.12) end)
+		btn.MouseLeave:Connect(function() tween(btnStroke, { Color = Theme.Border }, 0.12) end)
 		local lab = text(btn, def.default, 11, Theme.Text, BODY)
 		lab.Position = UDim2.fromOffset(11, 0)
 		lab.Size = UDim2.new(1, -30, 1, 0)
 		chevron(btn, UDim2.new(1, -15, 0.5, 0))
 		Controls[key] = { apply = function(v) lab.Text = v end }
-		btn.MouseButton1Click:Connect(function()
+		btn.Activated:Connect(function()
 			openPopup(btn, Vector2.new(140, #opts * 28 + 10), function(pop)
 				local list = create("Frame", {
 					BackgroundTransparency = 1,
@@ -1752,7 +1780,7 @@ local function makeRow(body, def)
 					pad(ob, 0, 8, 0, 10)
 					ob.MouseEnter:Connect(function() tween(ob, { BackgroundTransparency = 0.2 }, 0.08) end)
 					ob.MouseLeave:Connect(function() tween(ob, { BackgroundTransparency = 1 }, 0.08) end)
-					ob.MouseButton1Click:Connect(function()
+					ob.Activated:Connect(function()
 						lab.Text = o
 						commit(key, o)
 						closePopup()
@@ -1785,7 +1813,7 @@ local function makeRow(body, def)
 				swGlow.Color = c
 			end,
 		}
-		sw.MouseButton1Click:Connect(function() openColorPicker(sw, key) end)
+		sw.Activated:Connect(function() openColorPicker(sw, key) end)
 
 	elseif kind == "keybind" then
 		reg(def)
@@ -1802,9 +1830,11 @@ local function makeRow(body, def)
 			BorderSizePixel = 0,
 		}, row)
 		corner(btn, 8)
-		stroke(btn, Theme.Border, 1)
+		local kbStroke = stroke(btn, Theme.Border, 1)
+		btn.MouseEnter:Connect(function() tween(kbStroke, { Color = Theme.Accent }, 0.12) end)
+		btn.MouseLeave:Connect(function() tween(kbStroke, { Color = Theme.Border }, 0.12) end)
 		Controls[key] = { apply = function(v) btn.Text = v end }
-		btn.MouseButton1Click:Connect(function()
+		btn.Activated:Connect(function()
 			_G.__LilacBinding = true
 			_G.__LilacBindStart = os.clock()
 			btn.Text = "press a key..."
@@ -1817,6 +1847,9 @@ local function makeRow(body, def)
 				name = i.KeyCode.Name
 			elseif ut == Enum.UserInputType.MouseButton1 or ut == Enum.UserInputType.MouseButton2 or ut == Enum.UserInputType.MouseButton3 then
 				name = ut.Name
+			elseif ut.Name:sub(1, 7) == "Gamepad" and i.KeyCode ~= Enum.KeyCode.Thumbstick1
+				and i.KeyCode ~= Enum.KeyCode.Thumbstick2 and i.KeyCode ~= Enum.KeyCode.Unknown then
+				name = i.KeyCode.Name
 			end
 			if not name then return end
 			if os.clock() - (_G.__LilacBindStart or 0) < 0.15 then return end
@@ -1834,7 +1867,7 @@ local function makeRow(body, def)
 		local b = makeButton(row, def.label or def.name, 128, 26, def.primary)
 		b.AnchorPoint = Vector2.new(1, 0.5)
 		b.Position = UDim2.new(1, -14, 0.5, 0)
-		b.MouseButton1Click:Connect(function() def.fn() end)
+		b.Activated:Connect(function() def.fn() end)
 
 	elseif kind == "config" then
 		local tb = create("TextBox", {
@@ -1882,6 +1915,10 @@ local function buildCard(col, def)
 	}, col)
 	corner(card, 12)
 	stroke(card, Theme.Border, 1, 0.1)
+	create("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(205, 195, 212)),
+	}, card)
 	create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }, card)
 	table.insert(cardFrames, card)
 
@@ -1908,6 +1945,18 @@ local function buildCard(col, def)
 	}, header)
 	corner(dia, 1)
 	bindAccent(function() dia.BackgroundColor3 = Theme.Accent end)
+	local headLine = create("Frame", {
+		BackgroundColor3 = Theme.Accent,
+		BackgroundTransparency = 0.7,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, 1, -1),
+		Size = UDim2.new(1, 0, 0, 1),
+		ZIndex = 2,
+	}, header)
+	create("UIGradient", {
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) }),
+	}, headLine)
+	bindAccent(function() headLine.BackgroundColor3 = Theme.Accent end)
 	local title = text(header, def.title, 13, Theme.Text, HEAD)
 	title.Position = UDim2.fromOffset(36, 0)
 	title.Size = UDim2.new(1, -80, 1, 0)
@@ -1982,7 +2031,7 @@ local function buildCard(col, def)
 			round(pill)
 			local ps = stroke(pill, Theme.Border, 1)
 			table.insert(pills, { btn = pill, stroke = ps })
-			pill.MouseButton1Click:Connect(function()
+			pill.Activated:Connect(function()
 				obj.active = i
 				stylePills()
 				obj.layout()
@@ -2020,7 +2069,7 @@ local function buildCard(col, def)
 		Size = UDim2.fromOffset(1.6, 11),
 		Visible = false,
 	}, cb)
-	cb.MouseButton1Click:Connect(function()
+	cb.Activated:Connect(function()
 		obj.collapsed = not obj.collapsed
 		v1.Visible = obj.collapsed
 		obj.layout()
@@ -2170,14 +2219,6 @@ local function B(name, label, fn, tip, primary) return { type = "button", name =
 local rgb = Color3.fromRGB
 
 buildPage("Combat", {
-	{ title = "Crosshair", col = 1, rows = {
-		T("cross.enabled", "Crosshair", true, "Draw a custom crosshair in the preview"),
-		D("cross.style", "Style", { "Cross", "Dot", "Circle" }, "Crosshair shape"),
-		S("cross.size", "Size", 2, 24, 8, "Arm length / ring radius"),
-		S("cross.gap", "Gap", 0, 14, 4, "Distance from the center"),
-		S("cross.thick", "Thickness", 1, 5, 2, "Line thickness"),
-		C("cross.color", "Color", rgb(255, 255, 255), "Crosshair color"),
-	} },
 	{ title = "Hit Feedback", col = 2, rows = {
 		T("hit.enabled", "Hit Marker", true, "Click the preview to flash a hit marker"),
 		C("hit.color", "Hit Color", rgb(255, 80, 100), "Hit marker color"),
@@ -2186,8 +2227,10 @@ buildPage("Combat", {
 	{ title = "Aimbot", col = 1, rows = {
 		T("aim.enabled", "Aim Assist", false, "Pull the camera onto a target"),
 		{ type = "keybind", key = "aim.key", name = "Aim Key", default = "Q", tip = "Keyboard key or mouse button" },
+		{ type = "keybind", key = "aim.pad", name = "Controller Aim", default = "ButtonL2", tip = "Controller button" },
 		D("aim.mode", "Activation", { "Hold", "Toggle", "Always" }, "Hold the key, toggle it, or always on"),
-		S("aim.smooth", "Smoothness", 1, 30, 8, "1 = instant snap, higher = slower"),
+		S("aim.smooth", "Smoothness", 1, 30, 6, "1 = instant lock, higher = slower and softer"),
+		D("aim.sync", "Camera Sync", { "Early", "Late" }, "If your scope looks off-center try Late, if it jitters try Early"),
 		D("aim.bone", "Bone", { "Head", "Torso", "Closest" }, "Which body part to aim at"),
 		T("aim.wall", "Wall Check", true, "Ignore targets behind geometry"),
 		T("aim.team", "Team Check", true, "Ignore teammates"),
@@ -2202,6 +2245,7 @@ buildPage("Combat", {
 	{ title = "Triggerbot", col = 2, rows = {
 		T("trig.enabled", "Triggerbot", false, "Activates your equipped Tool when the cursor is on an enemy"),
 		{ type = "keybind", key = "trig.key", name = "Trigger Key", default = "E", tip = "Keyboard key or mouse button" },
+		{ type = "keybind", key = "trig.pad", name = "Controller Trigger", default = "ButtonR2", tip = "Controller button" },
 		D("trig.mode", "Activation", { "Hold", "Toggle", "Always" }, "Hold the key, toggle it, or always on"),
 		S("trig.delay", "Delay (ms)", 0, 300, 60, "Wait before firing"),
 		T("trig.wall", "Wall Check", true, "Only fire at targets you can actually see"),
@@ -2333,18 +2377,18 @@ buildPage("Character", {
 buildPage("Misc", {
 	{ title = "Interface", col = 1, rows = {
 		T("misc.notify", "Notifications", true, "Show toast messages"),
-		T("misc.tips", "Tooltips", true, "Show setting descriptions on hover"),
+		T("misc.tips", "Tooltips", not isMobile, "Show setting descriptions on hover"),
 		T("misc.compact", "Compact Mode", false, "Tighter row spacing"),
 		T("misc.antiafk", "Anti-AFK", false, "Stops the idle timeout from kicking you"),
 		B("Test Notification", "Send", function() notify("Lilac", "Notifications are working.") end, "Fire a test toast"),
 	} },
 	{ title = "Config", col = 2, rows = {
 		{ type = "config", name = "Config", tip = "Copy or paste a config string", hook = function(tb, exp, imp)
-			exp.MouseButton1Click:Connect(function()
+			exp.Activated:Connect(function()
 				tb.Text = serialize()
 				notify("Config exported", "Select the text to copy it.")
 			end)
-			imp.MouseButton1Click:Connect(function()
+			imp.Activated:Connect(function()
 				if importConfig(tb.Text) then
 					notify("Config imported", "Settings applied.")
 				else
@@ -2358,8 +2402,9 @@ buildPage("Misc", {
 buildPage("Settings", {
 	{ title = "Menu", col = 1, rows = {
 		{ type = "keybind", key = "set.menukey", name = "Menu Key", default = "RightShift", tip = "Show / hide the window" },
+		{ type = "keybind", key = "set.menupad", name = "Controller Menu", default = "ButtonSelect", tip = "Controller button that shows / hides the window" },
 		S("set.scale", "Interface Scale", 70, 120, 100, "Window scale (%)"),
-		T("set.preview", "Show Live Preview", true, "Show the preview panel"),
+		T("set.preview", "Show Live Preview", not isMobile, "Show the preview panel"),
 		T("set.lock", "Lock Window", false, "Disable dragging"),
 		T("set.confirm", "Confirm Resets", true, "Ask before resetting"),
 	} },
@@ -2378,7 +2423,11 @@ buildPage("Settings", {
 				notify("Reset complete", "All settings restored.")
 			end)
 		end, "Reset every setting", true),
-		B("Unload Interface", "Unload", function() unload() end, "Close and clean up Lilac"),
+		B("Unload Interface", "Unload", function()
+			confirm("Unload Lilac?", "This removes the menu and turns every feature off.", function()
+				unload()
+			end)
+		end, "Remove Lilac completely"),
 	} },
 })
 
@@ -2391,6 +2440,7 @@ local function styleNav()
 		local a = name == currentTab
 		tween(nb.btn, { BackgroundTransparency = a and 0 or 1 }, 0.15)
 		tween(nb.stroke, { Transparency = a and 0.05 or 1 }, 0.15)
+		tween(nb.bar, { BackgroundTransparency = a and 0 or 1 }, 0.15)
 		nb.label.TextColor3 = a and Theme.Text or Theme.Muted
 		nb.stroke.Color = Theme.Accent
 		nb.icon(a and Theme.Accent or Theme.Muted)
@@ -2424,19 +2474,28 @@ for i, name in ipairs(tabOrder) do
 		AutoButtonColor = false,
 		BackgroundColor3 = Theme.CardHead,
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 42),
+		Size = UDim2.new(1, 0, 0, isMobile and 34 or 42),
 		LayoutOrder = name == "Settings" and 100 or i,
 		BorderSizePixel = 0,
 	}, navHolder)
 	corner(btn, 12)
 	local st = stroke(btn, Theme.Accent, 1.5, 1)
+	local bar = create("Frame", {
+		BackgroundColor3 = Theme.Accent,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 3, 0.5, -9),
+		Size = UDim2.fromOffset(3, 18),
+	}, btn)
+	round(bar)
+	bindAccent(function() bar.BackgroundColor3 = Theme.Accent end)
 	local ic, setIc = makeIcon(name, btn)
 	ic.Position = UDim2.new(0, 14, 0.5, -10)
 	local lb = text(btn, name, 13, Theme.Muted, BODY)
 	lb.Position = UDim2.fromOffset(46, 0)
 	lb.Size = UDim2.new(1, -50, 1, 0)
-	navButtons[name] = { btn = btn, stroke = st, icon = setIc, label = lb }
-	btn.MouseButton1Click:Connect(function() selectTab(name) end)
+	navButtons[name] = { btn = btn, stroke = st, icon = setIc, label = lb, bar = bar }
+	btn.Activated:Connect(function() selectTab(name) end)
 	btn.MouseEnter:Connect(function()
 		if currentTab ~= name then tween(btn, { BackgroundTransparency = 0.6 }, 0.1) end
 	end)
@@ -2474,7 +2533,7 @@ Handlers["set.preview"] = function() updatePreviewVisible() end
 
 -- minimize / close
 local minimized = false
-minButton.MouseButton1Click:Connect(function()
+minButton.Activated:Connect(function()
 	minimized = not minimized
 	closePopup()
 	local h = minimized and 56 or RH
@@ -2488,16 +2547,87 @@ minButton.MouseButton1Click:Connect(function()
 		task.delay(0.2, updatePreviewVisible)
 	end
 end)
-closeButton.MouseButton1Click:Connect(unload)
+
+-- open / close: darken the screen, free the cursor and show it on top of the UI
+local prevMouseIcon = UserInputService.MouseIconEnabled
+local function setMenuOpen(open)
+	root.Visible = open
+	closePopup()
+	dim.Visible = open
+	dim.Modal = open
+	if open then
+		prevMouseIcon = UserInputService.MouseIconEnabled
+		UserInputService.MouseIconEnabled = true
+		dim.BackgroundTransparency = 1
+		tween(dim, { BackgroundTransparency = 0.45 }, 0.25)
+		if lastInputIsPad() then GuiService.SelectedObject = navButtons[currentTab].btn end
+	else
+		UserInputService.MouseIconEnabled = prevMouseIcon
+		GuiService.SelectedObject = nil
+	end
+end
+table.insert(cleanups, function()
+	if root.Visible then UserInputService.MouseIconEnabled = prevMouseIcon end
+end)
+
+-- floating open/close button (mobile only)
+if isMobile then
+	local mt = create("TextButton", {
+		Name = "LilacToggle",
+		Text = "L",
+		Font = HEAD,
+		TextSize = 20,
+		TextColor3 = Theme.Accent,
+		AutoButtonColor = false,
+		Selectable = false,
+		BackgroundColor3 = Theme.Card,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -12, 0, 64),
+		Size = UDim2.fromOffset(46, 46),
+		ZIndex = 400,
+	}, gui)
+	round(mt)
+	local mtStroke = stroke(mt, Theme.Accent, 1.5, 0.1)
+	bindAccent(function() mt.TextColor3 = Theme.Accent; mtStroke.Color = Theme.Accent end)
+	mt.Activated:Connect(function() setMenuOpen(not root.Visible) end)
+end
+
+-- controller hint bar
+local padHint = text(content, "A select    B back    LB / RB tabs    X / Y adjust sliders", 10, Theme.Muted, LIGHT, Enum.TextXAlignment.Right)
+padHint.Position = UDim2.fromOffset(22, RH - 20)
+padHint.Size = UDim2.fromOffset(CONTENT_W - 44, 14)
+padHint.ZIndex = 5
+padHint.Visible = lastInputIsPad()
+connect(UserInputService.LastInputTypeChanged, function()
+	padHint.Visible = lastInputIsPad()
+	if root.Visible and lastInputIsPad() and not GuiService.SelectedObject then
+		GuiService.SelectedObject = navButtons[currentTab].btn
+	end
+end)
 
 -- menu key
 connect(UserInputService.InputBegan, function(i)
 	if _G.__LilacBinding or UserInputService:GetFocusedTextBox() then return end
 	if os.clock() - (_G.__LilacBindTime or 0) < 0.3 then return end
-	if matchesBind(i, Settings["set.menukey"]) then
-		root.Visible = not root.Visible
-		modalBtn.Modal = root.Visible
-		closePopup()
+	if matchesBind(i, Settings["set.menukey"]) or matchesBind(i, Settings["set.menupad"]) then
+		setMenuOpen(not root.Visible)
+	end
+end)
+
+-- controller navigation: LB/RB tabs, B back, X/Y nudge the selected slider
+connect(UserInputService.InputBegan, function(i)
+	if not root.Visible or _G.__LilacBinding then return end
+	if i.UserInputType.Name:sub(1, 7) ~= "Gamepad" then return end
+	local kc = i.KeyCode
+	if kc == Enum.KeyCode.ButtonR1 or kc == Enum.KeyCode.ButtonL1 then
+		local idx = table.find(tabOrder, currentTab) or 1
+		idx = (idx - 1 + (kc == Enum.KeyCode.ButtonR1 and 1 or -1)) % #tabOrder + 1
+		selectTab(tabOrder[idx])
+	elseif kc == Enum.KeyCode.ButtonB then
+		if popup then closePopup() else setMenuOpen(false) end
+	elseif kc == Enum.KeyCode.ButtonX or kc == Enum.KeyCode.ButtonY then
+		local fn = sliderNudge[GuiService.SelectedObject]
+		if fn then fn(kc == Enum.KeyCode.ButtonY and 1 or -1) end
 	end
 end)
 
@@ -2508,6 +2638,8 @@ local t0 = os.clock()
 connect(RunService.Heartbeat, function(dt)
 	if not root.Visible then return end
 	local t = os.clock() - t0
+	fpsSmooth = fpsSmooth + (1 / math.max(dt, 1e-3) - fpsSmooth) * 0.05
+	fpsLabel.Text = string.format("%d FPS", math.floor(fpsSmooth + 0.5))
 
 	-- glow
 	local strength = Settings["vis.glow"] and (Settings["vis.glowstr"] / 100) or 0
@@ -2595,20 +2727,59 @@ end
 local function typing() return UserInputService:GetFocusedTextBox() ~= nil end
 
 local toggled = { aim = false, trig = false }
+local touchHeld = { aim = false, trig = false }
 local function modeActive(p)
 	local mode = Settings[p .. ".mode"]
 	if mode == "Always" then return true end
 	if mode == "Toggle" then return toggled[p] end
-	return bindDown(Settings[p .. ".key"])
+	return bindDown(Settings[p .. ".key"]) or bindDown(Settings[p .. ".pad"]) or touchHeld[p]
 end
 connect(UserInputService.InputBegan, function(i)
 	if _G.__LilacBinding or typing() then return end
 	for p in pairs(toggled) do
-		if Settings[p .. ".mode"] == "Toggle" and matchesBind(i, Settings[p .. ".key"]) then
+		if Settings[p .. ".mode"] == "Toggle"
+			and (matchesBind(i, Settings[p .. ".key"]) or matchesBind(i, Settings[p .. ".pad"])) then
 			toggled[p] = not toggled[p]
 		end
 	end
 end)
+
+-- on-screen AIM / FIRE buttons (mobile only)
+local aimBtn, trigBtn
+local function isTap(i)
+	return i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1
+end
+local function touchButton(p, label, pos)
+	local b = create("TextButton", {
+		Text = label,
+		Font = BOLD,
+		TextSize = 13,
+		TextColor3 = Theme.Text,
+		AutoButtonColor = false,
+		Selectable = false,
+		BackgroundColor3 = Theme.Card,
+		BackgroundTransparency = 0.1,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = pos,
+		Size = UDim2.fromOffset(66, 66),
+		Visible = false,
+		ZIndex = 5,
+	}, gui)
+	round(b)
+	stroke(b, Theme.Accent, 2, 0.2)
+	b.InputBegan:Connect(function(i)
+		if not isTap(i) then return end
+		if Settings[p .. ".mode"] == "Toggle" then toggled[p] = not toggled[p] else touchHeld[p] = true end
+	end)
+	b.InputEnded:Connect(function(i)
+		if isTap(i) then touchHeld[p] = false end
+	end)
+	return b
+end
+if isMobile then
+	aimBtn = touchButton("aim", "AIM", UDim2.new(1, -24, 1, -210))
+	trigBtn = touchButton("trig", "FIRE", UDim2.new(1, -108, 1, -250))
+end
 
 local function targetOk(plr, c, hum, p)
 	if not hum or hum.Health <= 0 then return false end
@@ -2925,9 +3096,18 @@ local function visibleFrom(part, c)
 	return workspace:Raycast(origin, part.Position - origin, params) == nil
 end
 
+local function aimRef()
+	local vs = cam.ViewportSize
+	local firstPerson = (cam.Focus.Position - cam.CFrame.Position).Magnitude < 1.5
+	if UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter or firstPerson or isMobile or lastInputIsPad() then
+		return Vector2.new(vs.X / 2, vs.Y / 2)
+	end
+	return UserInputService:GetMouseLocation()
+end
+
 local function bestTarget()
 	local S = Settings
-	local m = UserInputService:GetMouseLocation()
+	local m = aimRef()
 	local best, bestD = nil, S["fov.size"]
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if plr ~= lp then
@@ -2955,26 +3135,95 @@ local fovCircle = create("Frame", {
 round(fovCircle)
 local fovStroke = stroke(fovCircle, Color3.new(1, 1, 1), 1.5)
 
--- aim + trigger run after the default camera script
-local trigBusy = false
-RunService:BindToRenderStep("LilacAim", Enum.RenderPriority.Camera.Value + 1, function()
+-- sticky target: stay on the same player while the key is held (no jumping between bones)
+local sticky
+local function stickyValid(part)
+	if not part or not part.Parent then return false end
+	local c = part:FindFirstAncestorOfClass("Model")
+	local plr = c and Players:GetPlayerFromCharacter(c)
+	if not plr then return false end
+	local ch, hum, ok = alive(plr)
+	if not ok or not targetOk(plr, ch, hum, "aim") then return false end
+	local v, on = cam:WorldToViewportPoint(part.Position)
+	if not on or (Vector2.new(v.X, v.Y) - aimRef()).Magnitude > Settings["fov.size"] * 1.5 then return false end
+	if Settings["aim.wall"] and not visibleFrom(part, ch) then return false end
+	return true
+end
+
+-- aimbot: rotates the view toward the target relative to the crosshair/cursor.
+-- Works whether your game's camera keeps our rotation or recomputes it every frame.
+local lastAim = os.clock()
+local aimF, lastBase, lastSet = 0, nil, nil
+local function aimStep(which)
 	local S = Settings
-	local m = UserInputService:GetMouseLocation()
+	if S["aim.sync"] ~= which then return end
+	local nowT = os.clock()
+	local dtA = math.min(nowT - lastAim, 0.1)
+	lastAim = nowT
+
+	if S["aim.enabled"] and not typing() and modeActive("aim") then
+		local target = sticky
+		if not stickyValid(target) then
+			target = bestTarget()
+			sticky = target
+			aimF = 0
+		end
+		if target then
+			local ref = aimRef()
+			local cf = cam.CFrame
+			local persisted = false
+			if lastSet and lastBase then
+				local d1 = math.acos(math.clamp(cf.LookVector:Dot(lastSet.LookVector), -1, 1))
+				local d2 = math.acos(math.clamp(cf.LookVector:Dot(lastBase.LookVector), -1, 1))
+				persisted = d1 <= d2
+			end
+			local under = cam:ViewportPointToRay(ref.X, ref.Y).Direction.Unit
+			local want = (target.Position - cf.Position).Unit
+			local axis = under:Cross(want)
+			local angle = math.acos(math.clamp(under:Dot(want), -1, 1))
+			local alpha = S["aim.smooth"] <= 1 and 1 or (1 - math.exp(-dtA * 40 / S["aim.smooth"]))
+			local frac
+			if persisted then
+				aimF = 0
+				frac = alpha
+			else
+				aimF = aimF + (1 - aimF) * alpha
+				frac = aimF
+			end
+			if axis.Magnitude > 1e-5 and angle > 1e-4 then
+				local rot = CFrame.fromAxisAngle(axis.Unit, angle * frac)
+				local newCf = CFrame.new(cf.Position) * rot * (cf - cf.Position)
+				lastBase, lastSet = cf, newCf
+				cam.CFrame = newCf
+			else
+				lastBase, lastSet = cf, cf
+			end
+		else
+			lastBase, lastSet, aimF = nil, nil, 0
+		end
+	else
+		sticky, aimF, lastBase, lastSet = nil, 0, nil, nil
+	end
+end
+RunService:BindToRenderStep("LilacAimE", Enum.RenderPriority.Camera.Value + 1, function() aimStep("Early") end)
+RunService:BindToRenderStep("LilacAimL", Enum.RenderPriority.Last.Value, function() aimStep("Late") end)
+table.insert(cleanups, function()
+	RunService:UnbindFromRenderStep("LilacAimE")
+	RunService:UnbindFromRenderStep("LilacAimL")
+end)
+
+-- fov circle + triggerbot (not camera work)
+local trigBusy = false
+connect(RunService.RenderStepped, function()
+	local S = Settings
+	local ref = aimRef()
 	fovCircle.Visible = S["aim.enabled"] and S["fov.draw"] and root.Visible
-	fovCircle.Position = UDim2.fromOffset(m.X, m.Y)
+	fovCircle.Position = UDim2.fromOffset(ref.X, ref.Y)
 	fovCircle.Size = UDim2.fromOffset(S["fov.size"] * 2, S["fov.size"] * 2)
 	fovStroke.Color = S["fov.color"]
 
-	if S["aim.enabled"] and not typing() and modeActive("aim") then
-		local target = bestTarget()
-		if target then
-			local goal = CFrame.new(cam.CFrame.Position, target.Position)
-			cam.CFrame = cam.CFrame:Lerp(goal, math.clamp(1 / S["aim.smooth"], 0, 1))
-		end
-	end
-
 	if S["trig.enabled"] and not trigBusy and not typing() and modeActive("trig") then
-		local ray = cam:ViewportPointToRay(m.X, m.Y)
+		local ray = cam:ViewportPointToRay(ref.X, ref.Y)
 		local params = RaycastParams.new()
 		if S["trig.wall"] then
 			params.FilterType = Enum.RaycastFilterType.Exclude
@@ -3003,7 +3252,6 @@ RunService:BindToRenderStep("LilacAim", Enum.RenderPriority.Camera.Value + 1, fu
 		end
 	end
 end)
-table.insert(cleanups, function() RunService:UnbindFromRenderStep("LilacAim") end)
 
 -- hitbox expander (client-side only) ---------------------------------------
 local origSizes = {}
@@ -3053,6 +3301,17 @@ end)
 connect(RunService.Heartbeat, function()
 	local S = Settings
 	local t = os.clock()
+
+	-- mobile on-screen buttons
+	if isMobile then
+		local show = not root.Visible
+		for p, b in pairs({ aim = aimBtn, trig = trigBtn }) do
+			b.Visible = show and S[p .. ".enabled"] and S[p .. ".mode"] ~= "Always"
+			local on = toggled[p] or touchHeld[p]
+			b.BackgroundColor3 = on and Theme.Accent or Theme.Card
+			b.TextColor3 = on and Color3.fromRGB(24, 10, 28) or Theme.Text
+		end
+	end
 
 	-- ESP
 	local want = S["live.esp"] and S["esp.enabled"]
@@ -3162,5 +3421,6 @@ bulk = false
 renderPreview()
 updatePreviewVisible()
 selectTab("ESP")
+setMenuOpen(true)
 print("[Lilac] loaded")
 notify("Lilac loaded", "Press " .. Settings["set.menukey"] .. " to hide or show.")
