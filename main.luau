@@ -409,7 +409,6 @@ gui = create("ScreenGui", {
 
 local root = create("Frame", {
 	Name = "Root",
-	ZIndex = 10,
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromScale(0.5, 0.5),
 	Size = UDim2.fromOffset(RW, RH),
@@ -1055,9 +1054,6 @@ end
 -- live preview panel
 --------------------------------------------------------------------------
 local preview, previewGlow, previewGlowStroke, char, parts, renderPreview, updatePreviewVisible
--- These preview references are shared with the main render loop below the preview scope.
-local avatarPreview: {[string]: any} = {}
-local currentTab = "ESP" -- forward-declared so preview visibility can read the active page
 do -- preview scope (keeps the main chunk under the 200-local limit)
 local SW, SH = 240, 504
 local PH = 560
@@ -1338,80 +1334,6 @@ local function arrow(x, y, rot)
 end
 local arrowR, arrowT, arrowL = arrow(SW - 16, 130, 45), arrow(SW / 2 + 40, 20, 45), arrow(16, 400, 45)
 
--- 3D player avatar preview. This replaces the old flat placeholder body with
--- a live clone of the local player's Roblox avatar, shown only in the ESP page.
-local avatarViewport = create("ViewportFrame", {
-	Name = "Avatar3DPreview",
-	BackgroundTransparency = 1,
-	BorderSizePixel = 0,
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromOffset(SW / 2, SH / 2 + 2),
-	Size = UDim2.fromOffset(164, 244),
-	ZIndex = 2,
-	LightColor = Color3.fromRGB(255, 235, 255),
-	Ambient = Color3.fromRGB(145, 120, 165),
-	Visible = true,
-}, screen)
-avatarPreview.world = create("WorldModel", { Name = "AvatarWorld" }, avatarViewport)
-avatarPreview.camera = create("Camera", { FieldOfView = 34 }, avatarViewport)
-avatarViewport.CurrentCamera = avatarPreview.camera
-local avatarRefreshBusy = false
-
-local function refreshAvatarPreview()
-	if avatarRefreshBusy then return end
-	avatarRefreshBusy = true
-	task.spawn(function()
-		local ok, err = pcall(function()
-			local liveCharacter = player.Character or player.CharacterAdded:Wait()
-			if not liveCharacter or not liveCharacter.Parent then return end
-			local wasArchivable = liveCharacter.Archivable
-			liveCharacter.Archivable = true
-			local clone = liveCharacter:Clone()
-			liveCharacter.Archivable = wasArchivable
-			if not clone then return end
-			for _, obj in ipairs(clone:GetDescendants()) do
-				if obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
-					obj:Destroy()
-				elseif obj:IsA("BasePart") then
-					obj.Anchored = true
-					obj.CanCollide = false
-					obj.CastShadow = false
-				end
-			end
-			local hum = clone:FindFirstChildOfClass("Humanoid")
-			if hum then
-				local animator = hum:FindFirstChildOfClass("Animator")
-				if animator then animator:Destroy() end
-				hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-			end
-			if avatarPreview.model then avatarPreview.model:Destroy() end
-			clone.Parent = avatarPreview.world
-			avatarPreview.model = clone
-			local boxCF, boxSize = clone:GetBoundingBox()
-			clone:PivotTo(clone:GetPivot() - boxCF.Position)
-			avatarPreview.basePivot = clone:GetPivot()
-			local height = math.max(boxSize.Y, 4)
-			avatarPreview.camera.CFrame = CFrame.lookAt(Vector3.new(0, height * 0.12, height * 2.7), Vector3.new(0, height * 0.48, 0))
-		end)
-		if not ok then warn("[Lilac] 3D avatar preview refresh failed: " .. tostring(err)) end
-		avatarRefreshBusy = false
-	end)
-end
-
--- Hide only the fake 2D body; retain its ESP overlay elements (box, labels,
--- health bar, skeleton and markers) so the preview settings still have feedback.
-for _, item in pairs(parts) do item.frame.Visible = false end
-sleeveL.Visible = false
-sleeveR.Visible = false
-hair.Visible = false
-for _, child in ipairs(head:GetChildren()) do
-	if child:IsA("GuiObject") then child.Visible = false end
-end
-refreshAvatarPreview()
-connect(player.CharacterAdded, function()
-	task.delay(0.75, refreshAvatarPreview)
-end)
-
 -- hit marker
 local hitBars = {}
 for i = 1, 4 do
@@ -1468,11 +1390,7 @@ end)
 -- preview collapse
 local pvCollapsed = false
 function updatePreviewVisible()
-	-- The live ESP preview belongs to the ESP page only; don't leave it
-	-- floating beside Combat / Visuals / other pages.
-	local show = Settings["set.preview"] ~= false
-		and currentTab == "ESP"
-		and not (main.Size.Y.Offset < 100)
+	local show = Settings["set.preview"] ~= false and not (main.Size.Y.Offset < 100)
 	preview.Visible = show
 	previewGlow.Visible = show
 end
@@ -1984,6 +1902,7 @@ end
 -- cards + pages
 --------------------------------------------------------------------------
 local pages = {}
+local currentTab = "ESP"
 
 local function buildCard(col, def)
 	local card = create("Frame", {
@@ -2543,7 +2462,6 @@ local function selectTab(name)
 	tween(p.scroll, { Position = UDim2.fromOffset(22, 84) }, 0.25)
 	moduleLabel.Text = p.count .. (p.count == 1 and " module" or " modules")
 	styleNav()
-	if updatePreviewVisible then updatePreviewVisible() end
 end
 
 for i, name in ipairs(tabOrder) do
@@ -2630,28 +2548,8 @@ minButton.Activated:Connect(function()
 	end
 end)
 
--- open / close: release the first-person mouse while the menu is open.
--- Some first-person camera controllers re-apply LockCenter every frame, so a
--- one-time MouseBehavior assignment is not sufficient. Enforce the free cursor
--- after the camera update, then restore the state captured when the menu opened.
+-- open / close: darken the screen, free the cursor and show it on top of the UI
 local prevMouseIcon = UserInputService.MouseIconEnabled
-local prevMouseBehavior = UserInputService.MouseBehavior
-local cursorEnforcerBound = false
-local CURSOR_BIND_NAME = "LilacMenuCursorEnforcer"
-local function bindMenuCursorEnforcer()
-	if cursorEnforcerBound then return end
-	cursorEnforcerBound = true
-	RunService:BindToRenderStep(CURSOR_BIND_NAME, Enum.RenderPriority.Last.Value + 10, function()
-		if not root.Parent or not root.Visible then return end
-		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-		UserInputService.MouseIconEnabled = true
-	end)
-end
-local function unbindMenuCursorEnforcer()
-	if not cursorEnforcerBound then return end
-	cursorEnforcerBound = false
-	RunService:UnbindFromRenderStep(CURSOR_BIND_NAME)
-end
 local function setMenuOpen(open)
 	root.Visible = open
 	closePopup()
@@ -2659,27 +2557,17 @@ local function setMenuOpen(open)
 	dim.Modal = open
 	if open then
 		prevMouseIcon = UserInputService.MouseIconEnabled
-		prevMouseBehavior = UserInputService.MouseBehavior
-		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 		UserInputService.MouseIconEnabled = true
-		bindMenuCursorEnforcer()
 		dim.BackgroundTransparency = 1
 		tween(dim, { BackgroundTransparency = 0.45 }, 0.25)
 		if lastInputIsPad() then GuiService.SelectedObject = navButtons[currentTab].btn end
 	else
-		unbindMenuCursorEnforcer()
-		UserInputService.MouseBehavior = prevMouseBehavior
 		UserInputService.MouseIconEnabled = prevMouseIcon
 		GuiService.SelectedObject = nil
 	end
-	if updatePreviewVisible then updatePreviewVisible() end
 end
 table.insert(cleanups, function()
-	unbindMenuCursorEnforcer()
-	if root.Visible then
-		UserInputService.MouseBehavior = prevMouseBehavior
-		UserInputService.MouseIconEnabled = prevMouseIcon
-	end
+	if root.Visible then UserInputService.MouseIconEnabled = prevMouseIcon end
 end)
 
 -- floating open/close button (mobile only)
@@ -2783,10 +2671,6 @@ connect(RunService.Heartbeat, function(dt)
 	if previewDirty then
 		previewDirty = false
 		renderPreview()
-	end
-	if avatarPreview.model and avatarPreview.model.Parent == avatarPreview.world and avatarPreview.basePivot then
-		local spin = CFrame.Angles(0, math.rad((t * 32) % 360), 0)
-		avatarPreview.model:PivotTo(spin * avatarPreview.basePivot)
 	end
 	if Settings["char.sway"] then
 		char.Rotation = math.sin(t * Settings["char.speed"]) * 1.6
@@ -3333,8 +3217,7 @@ local trigBusy = false
 connect(RunService.RenderStepped, function()
 	local S = Settings
 	local ref = aimRef()
-	-- The gameplay FOV indicator must not disappear just because the menu closes.
-	fovCircle.Visible = S["aim.enabled"] and S["fov.draw"]
+	fovCircle.Visible = S["aim.enabled"] and S["fov.draw"] and root.Visible
 	fovCircle.Position = UDim2.fromOffset(ref.X, ref.Y)
 	fovCircle.Size = UDim2.fromOffset(S["fov.size"] * 2, S["fov.size"] * 2)
 	fovStroke.Color = S["fov.color"]
