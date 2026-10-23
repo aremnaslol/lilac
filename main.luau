@@ -1,6 +1,10 @@
--- Errors --
--- 1: no local player found
--- 2: player gui not loading
+--[[
+	ROSE
+	Premium client — FULL mode on place 17625359962 (silent + rage + skins),
+	UNIVERSAL mode everywhere else (aimbot + shared features).
+	Menu key: RightShift (rebindable). Console: ButtonSelect.
+	Logo: place rose_logo.png next to the script for getcustomasset.
+]]
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -11,25 +15,27 @@ local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
 local Stats = game:GetService("Stats")
 
-if _G.__LilacCleanup then pcall(_G.__LilacCleanup) end
+if _G.__RoseCleanup then pcall(_G.__RoseCleanup) end
 
-print("[Lilac Premium] starting...")
-local LILAC_FULL_PLACE = 17625359962
-local lilacFullGame = (game.PlaceId == LILAC_FULL_PLACE)
-shared.LilacFullGame = lilacFullGame
-print("lilac loaded")
+print("[Rose] starting...")
+-- Full-feature place (fighter remotes / advanced combat). Elsewhere: universal only.
+local ROSE_FULL_PLACE = 17625359962
+local roseFullGame = (game.PlaceId == ROSE_FULL_PLACE)
+shared.RoseFullGame = roseFullGame
+print("[Rose] logo: drop rose_logo.png beside script for custom asset")
+print("[Rose] PlaceId", game.PlaceId, "→", roseFullGame and "FULL (silent + rage + skins)" or "UNIVERSAL (aimbot + shared features)")
 
 local player = Players.LocalPlayer
 if not player then
-	warn("error: make a ticket error code: 1")
+	warn("[Rose] No LocalPlayer. You are in Edit mode. Press Play (or Run a client) first, then execute again.")
 	return
 end
 local playerGui = player:WaitForChild("PlayerGui", 10)
 if not playerGui then
-	warn("error: make a ticket error code: 2")
+	warn("[Rose] PlayerGui never loaded.")
 	return
 end
-for _, n in ipairs({ "LilacUI", "LilacHUD", "LilaecCursor" }) do
+for _, n in ipairs({ "RoseUI", "RoseHUD", "RoseCursor" }) do
 	local s = playerGui:FindFirstChild(n)
 	if s then s:Destroy() end
 end
@@ -55,15 +61,15 @@ local function unload()
 	end
 	table.clear(connections)
 	if gui then gui:Destroy() end
-	_G.__LilacBinding = nil
-	_G.__LilacCleanup = nil
+	_G.__RoseBinding = nil
+	_G.__RoseCleanup = nil
 end
-_G.__LilacCleanup = unload
+_G.__RoseCleanup = unload
 
 --------------------------------------------------------------------------
 -- platform
 --------------------------------------------------------------------------
-local forcedPlatform = _G.LilacPlatform
+local forcedPlatform = _G.RosePlatform
 local function deviceClass()
 	if forcedPlatform then return forcedPlatform end
 	local U = UserInputService
@@ -105,23 +111,23 @@ local BOLD = Enum.Font.GothamBold
 local HEAD = Enum.Font.Merriweather
 
 local Theme = {
-	Bg = Color3.fromRGB(10, 6, 14),
-	Sidebar = Color3.fromRGB(14, 8, 18),
-	Card = Color3.fromRGB(22, 12, 28),
-	CardHead = Color3.fromRGB(32, 18, 40),
-	Field = Color3.fromRGB(12, 7, 16),
-	Border = Color3.fromRGB(78, 42, 78),
-	Text = Color3.fromRGB(250, 240, 250),
-	Muted = Color3.fromRGB(160, 130, 165),
-	Off = Color3.fromRGB(48, 32, 52),
-	Accent = Color3.fromRGB(245, 140, 210),
-	Accent2 = Color3.fromRGB(180, 100, 240),
-	Glow = Color3.fromRGB(255, 160, 230),
-	Glass = Color3.fromRGB(30, 16, 36),
+	Bg = Color3.fromRGB(8, 5, 14),
+	Sidebar = Color3.fromRGB(12, 7, 20),
+	Card = Color3.fromRGB(20, 12, 32),
+	CardHead = Color3.fromRGB(30, 16, 44),
+	Field = Color3.fromRGB(10, 6, 18),
+	Border = Color3.fromRGB(90, 55, 140),
+	Text = Color3.fromRGB(248, 242, 255),
+	Muted = Color3.fromRGB(155, 135, 185),
+	Off = Color3.fromRGB(45, 32, 65),
+	Accent = Color3.fromRGB(186, 140, 255),
+	Accent2 = Color3.fromRGB(140, 100, 255),
+	Glow = Color3.fromRGB(200, 160, 255),
+	Glass = Color3.fromRGB(28, 16, 42),
 }
 
 local Presets = {
-	Lilac = { Color3.fromRGB(240, 130, 200), Color3.fromRGB(176, 92, 232) },
+	Rose = { Color3.fromRGB(186, 140, 255), Color3.fromRGB(140, 100, 255) },
 	Rose = { Color3.fromRGB(255, 110, 140), Color3.fromRGB(255, 160, 110) },
 	Violet = { Color3.fromRGB(150, 110, 255), Color3.fromRGB(100, 150, 255) },
 	Ice = { Color3.fromRGB(110, 200, 255), Color3.fromRGB(150, 130, 255) },
@@ -461,7 +467,7 @@ end
 -- screen guis
 --------------------------------------------------------------------------
 gui = create("ScreenGui", {
-	Name = "LilacUI",
+	Name = "RoseUI",
 	ResetOnSpawn = false,
 	IgnoreGuiInset = true,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
@@ -470,7 +476,7 @@ gui = create("ScreenGui", {
 
 -- ESP / FOV / HUD live here so they keep working while the menu is closed
 local hudGui = create("ScreenGui", {
-	Name = "LilacHUD",
+	Name = "RoseHUD",
 	ResetOnSpawn = false,
 	IgnoreGuiInset = true,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
@@ -479,7 +485,7 @@ local hudGui = create("ScreenGui", {
 
 -- software cursor, always drawn above the menu (fixes the cursor hiding under the UI in first person)
 local cursorGui = create("ScreenGui", {
-	Name = "LilacCursor",
+	Name = "RoseCursor",
 	ResetOnSpawn = false,
 	IgnoreGuiInset = true,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
@@ -624,22 +630,76 @@ do
 	local logo = create("Frame", {
 		BackgroundColor3 = Theme.CardHead,
 		Position = UDim2.fromOffset(14, 13),
-		Size = UDim2.fromOffset(38, 38),
+		Size = UDim2.fromOffset(40, 40),
 		BorderSizePixel = 0,
 	}, sidebar)
-	corner(logo, 11)
-	local logoStroke = stroke(logo, Theme.Accent, 1.2)
-	local logoText = text(logo, "L", 21, Theme.Accent, HEAD, Enum.TextXAlignment.Center)
-	logoText.Size = UDim2.fromScale(1, 1)
+	corner(logo, 12)
+	local logoStroke = stroke(logo, Theme.Accent, 1.4)
+	-- Rose logo image (executor getcustomasset) or drawn fallback
+	local logoImg = create("ImageLabel", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		ScaleType = Enum.ScaleType.Fit,
+		Image = "",
+		ZIndex = 2,
+	}, logo)
+	local logoAsset = nil
+	pcall(function()
+		local candidates = {
+			"rose_logo.png",
+			"Rose/logo.png",
+			"jPCqZ-removebg-preview.png",
+		}
+		for _, pth in ipairs(candidates) do
+			if type(isfile) == "function" and isfile(pth) and type(getcustomasset) == "function" then
+				logoAsset = getcustomasset(pth)
+				break
+			end
+		end
+		if not logoAsset and type(getcustomasset) == "function" and type(writefile) == "function" then
+			-- leave empty; user can drop rose_logo.png into workspace folder
+		end
+	end)
+	if type(logoAsset) == "string" and logoAsset ~= "" then
+		logoImg.Image = logoAsset
+	else
+		-- Drawn flower + bolt fallback matching the Rose mark
+		logoImg.Visible = false
+		local petalColor = Color3.fromRGB(200, 170, 255)
+		for i = 0, 5 do
+			local ang = i * 60
+			local petal = create("Frame", {
+				BackgroundColor3 = petalColor,
+				BorderSizePixel = 0,
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = UDim2.new(0.5, 0, 0.52, 0),
+				Size = UDim2.fromOffset(10, 14),
+				Rotation = ang,
+				ZIndex = 2,
+			}, logo)
+			corner(petal, 6)
+		end
+		local core = create("Frame", {
+			BackgroundColor3 = Color3.fromRGB(20, 12, 28),
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(14, 14),
+			ZIndex = 3,
+		}, logo)
+		corner(core, 7)
+		local bolt = text(core, "⚡", 10, Color3.fromRGB(230, 210, 255), BOLD, Enum.TextXAlignment.Center)
+		bolt.Size = UDim2.fromScale(1, 1)
+		bolt.ZIndex = 4
+	end
 	bindAccent(function()
 		logoStroke.Color = Theme.Accent
-		logoText.TextColor3 = Theme.Accent
 	end)
 
-	local brand = text(sidebar, "Lilac", 18, Theme.Text, HEAD)
+	local brand = text(sidebar, "Rose", 18, Theme.Text, HEAD)
 	brand.Position = UDim2.fromOffset(62, 12)
 	brand.Size = UDim2.new(1, -70, 0, 24)
-	local brandSub = text(sidebar, "PREMIUM  ·  v4.0", 8, Theme.Muted, LIGHT)
+	local brandSub = text(sidebar, "PREMIUM  ·  v1.0", 8, Theme.Muted, LIGHT)
 	brandSub.Position = UDim2.fromOffset(63, 36)
 	brandSub.Size = UDim2.new(1, -70, 0, 14)
 
@@ -682,7 +742,7 @@ do
 	pName.Position = UDim2.fromOffset(56, 9)
 	pName.Size = UDim2.new(1, -62, 0, 18)
 	pName.TextTruncate = Enum.TextTruncate.AtEnd
-	pSub = text(profile, "Lilac Premium  ·  " .. (lilacFullGame and "FULL" or "UNI") .. "  ·  " .. activePlat, 10, Theme.Muted, LIGHT)
+	pSub = text(profile, "Rose  ·  " .. (roseFullGame and "FULL" or "UNI") .. "  ·  " .. activePlat, 10, Theme.Muted, LIGHT)
 	pSub.Position = UDim2.fromOffset(56, 28)
 	pSub.Size = UDim2.new(1, -62, 0, 14)
 	if isMobile then profile.Visible = false; modulesLbl.Visible = false end
@@ -1223,7 +1283,7 @@ local screen = create("Frame", {
 corner(screen, 11)
 stroke(screen, Theme.Border, 1)
 
-local pvBadge = text(screen, "LILAC · PREVIEW", 8, Theme.Muted, BOLD)
+local pvBadge = text(screen, "ROSE · PREVIEW", 8, Theme.Muted, BOLD)
 pvBadge.Position = UDim2.fromOffset(10, 8)
 pvBadge.Size = UDim2.fromOffset(150, 12)
 
@@ -1945,12 +2005,12 @@ local function makeRow(body, def)
 		btn.MouseLeave:Connect(function() tween(kbStroke, { Color = Theme.Border }, 0.12) end)
 		Controls[key] = { apply = function(v) btn.Text = prettyKey(v) end }
 		btn.Activated:Connect(function()
-			_G.__LilacBinding = true
-			_G.__LilacBindStart = os.clock()
+			_G.__RoseBinding = true
+			_G.__RoseBindStart = os.clock()
 			btn.Text = "press any key..."
 		end)
 		connect(UserInputService.InputBegan, function(i)
-			if not _G.__LilacBinding or btn.Text ~= "press any key..." then return end
+			if not _G.__RoseBinding or btn.Text ~= "press any key..." then return end
 			local name
 			local ut = i.UserInputType
 			if ut == Enum.UserInputType.Keyboard then
@@ -1962,9 +2022,9 @@ local function makeRow(body, def)
 				name = i.KeyCode.Name
 			end
 			if not name then return end
-			if os.clock() - (_G.__LilacBindStart or 0) < 0.15 then return end
-			_G.__LilacBinding = false
-			_G.__LilacBindTime = os.clock()
+			if os.clock() - (_G.__RoseBindStart or 0) < 0.15 then return end
+			_G.__RoseBinding = false
+			_G.__RoseBindTime = os.clock()
 			if name == "Escape" or name == "ButtonB" then
 				btn.Text = prettyKey(Settings[key])
 			elseif name == "Backspace" then
@@ -2018,7 +2078,7 @@ local pages = {}
 local currentTab = "ESP"
 
 local function buildCard(col, def)
-	if def.game == "full" and not lilacFullGame then
+	if def.game == "full" and not roseFullGame then
 		return nil
 	end
 	local card = create("Frame", {
@@ -2248,8 +2308,8 @@ local function platOk(r)
 	local p = r:GetAttribute("Plat")
 	if not (p == nil or p == "" or p:find(activePlat, 1, true) ~= nil) then return false end
 	local g = r:GetAttribute("Game")
-	if g == "full" and not lilacFullGame then return false end
-	if g == "universal" and lilacFullGame then return false end
+	if g == "full" and not roseFullGame then return false end
+	if g == "universal" and roseFullGame then return false end
 	return true
 end
 
@@ -2333,17 +2393,17 @@ local function importConfig(str)
 end
 
 --------------------------------------------------------------------------
--- named configs (Lilac/configs/<name>.json)
+-- named configs (Rose/configs/<name>.json)
 --------------------------------------------------------------------------
-local CFG_DIR = "Lilac/configs"
-local CFG_META = "Lilac/autoload.txt"
+local CFG_DIR = "Rose/configs"
+local CFG_META = "Rose/autoload.txt"
 local _configListCache = { "default" }
 local refreshConfigDropdown = nil -- optional UI refresh hook
 
 local function ensureCfgDir()
 	if type(makefolder) ~= "function" then return end
 	pcall(function()
-		if type(isfolder) == "function" and not isfolder("Lilac") then makefolder("Lilac") end
+		if type(isfolder) == "function" and not isfolder("Rose") then makefolder("Rose") end
 		if type(isfolder) == "function" and not isfolder(CFG_DIR) then makefolder(CFG_DIR) end
 	end)
 end
@@ -2438,7 +2498,7 @@ local MODES = { "Hold", "Toggle", "Always" }
 buildPage("Combat", {
 	{ title = "Aimbot", col = 1, tabs = {
 		{ name = "General", rows = {
-			T("aim.enabled", "Aimbot", false, lilacFullGame and "Full-game aim assist (mouse + advanced targeting)" or "Universal aim assist — mouse move toward target"),
+			T("aim.enabled", "Aimbot", false, roseFullGame and "Full-game aim assist (mouse + advanced targeting)" or "Universal aim assist — mouse move toward target"),
 			K("aim.key", "Aim Key", defKey("MouseButton2", "ButtonL2"), "One bind for keyboard, mouse AND controller. Backspace clears it"),
 			D("aim.mode", "Activation", MODES, "Hold the key, toggle it, or always on"),
 			D("aim.method", "Method", { "Mouse", "Camera" }, "Mouse = natural mouse move (recommended). Camera = force CFrame (some games fight this)"),
@@ -2468,48 +2528,62 @@ buildPage("Combat", {
 	} },
 	{ title = "Silent Aim", col = 1, game = "full", tabs = {
 		{ name = "Main", rows = {
-			T("silent.enabled", "Silent Aim", false, "Premium silent lock — no hard camera snap. Soft assist + auto-fire options"),
+			T("silent.enabled", "Silent Aim", false, "Redirects shot direction to the target (same core path as the full-place client)"),
 			K("silent.key", "Silent Key", defKey("MouseButton2", "ButtonL2"), "Activation bind"),
 			D("silent.mode", "Activation", MODES, "Hold, toggle, or always"),
-			D("silent.bone", "Aim Part", { "Head", "Torso", "Closest", "Hitscan" }, "Hitscan prefers head then body"),
-			D("silent.priority", "Priority", { "Crosshair", "Distance", "Lowest HP" }, "Target ranking"),
-			S("silent.maxdist", "Max Distance", 50, 2000, 900, "Studs"),
-			T("silent.wall", "Wall Check", true, "Require line of sight"),
-			T("silent.team", "Team Check", true, "Ignore teammates"),
+			D("silent.part", "Target Part", { "Head", "UpperTorso", "HumanoidRootPart", "Closest" }, "Primary aim bone"),
+			T("silent.closestpart", "Closest Part", false, "Pick nearest body part to crosshair"),
+			T("silent.manipulation", "Manipulation", false, "Adjust shoot origin toward target"),
+			S("silent.headchance", "Headshot Chance", 0, 100, 70, "%"),
+			S("silent.hitchance", "Hit Chance", 0, 100, 100, "% of shots that actually redirect"),
 		} },
-		{ name = "Behavior", rows = {
-			S("silent.fov", "Silent FOV", 20, 400, 140, "Pixel radius around crosshair"),
-			S("silent.smooth", "Assist Strength", 0, 30, 12, "0 = pure silent (no camera), higher = soft camera assist"),
-			S("silent.headchance", "Headshot %", 0, 100, 70, "Chance to prefer head over body"),
-			S("silent.reaction", "Reaction (ms)", 0, 400, 40, "Delay before accepting a new target"),
-			S("silent.forget", "Forget (ms)", 0, 800, 200, "Keep target after leaving FOV"),
-			T("silent.autofire", "Auto Fire", false, "Activate equipped tool when a target is valid"),
+		{ name = "Targeting", rows = {
+			T("silent.visible", "Visible Only", true, "Require line of sight"),
+			T("silent.team", "Team Check", true, "Ignore teammates"),
+			T("silent.ignoreprot", "Ignore Protected", true, "Skip forcefield / protected"),
+			T("silent.limitdist", "Limit Distance", false, "Cap max target distance"),
+			S("silent.maxdist", "Max Distance", 10, 1000, 250, "Studs"),
+			S("silent.reaction", "Reaction Time", 0, 1000, 0, "ms before locking"),
+			S("silent.forget", "Forget Time", 0, 10, 1, "Seconds to keep target after leave FOV", 0.1),
+			T("silent.disableflash", "Disable On Flash", false, "Pause while flashed"),
+		} },
+		{ name = "FOV", rows = {
+			T("silent.drawfov", "Show FOV", true, "Draw silent FOV circle"),
+			S("silent.fov", "Radius", 20, 600, 140, "Pixels"),
+			T("silent.fovfill", "Fill", false, "Fill FOV circle"),
+			T("silent.fovoutline", "Outline", true, "Outline ring"),
+			S("silent.lerp", "Lerp", 1, 100, 100, "FOV follow smoothness %"),
+		} },
+		{ name = "Fire", rows = {
+			T("silent.autofire", "Auto Shoot", false, "Fire while a valid target is locked"),
+			T("silent.autoreload", "Auto Reload", false, "Reload when empty (if tool supports)"),
 			S("silent.firerate", "Fire Rate (ms)", 40, 600, 90, "Delay between auto shots"),
-			T("silent.drawfov", "Draw FOV", true, "Show silent FOV ring"),
+			T("silent.showtarget", "Target HUD", true, "Highlight current silent target"),
 		} },
 	} },
-	{ title = "Ragebot", col = 1, game = "full", tabs = {
+		{ title = "Ragebot", col = 1, game = "full", tabs = {
 		{ name = "Main", rows = {
-			T("rage.enabled", "Ragebot", false, "Premium rage — instant lock, wide FOV, autofire. Overrides aimbot while active"),
+			T("rage.enabled", "Ragebot", false, "Full-place rage: instant lock + shot redirect + autofire (same remote path as silent)"),
 			K("rage.key", "Rage Key", defKey("Z", "ButtonR1"), "One bind for keyboard, mouse AND controller"),
-			D("rage.mode", "Activation", MODES, "Hold the key, toggle it, or always on"),
-			S("rage.fov", "Rage FOV", 5, 180, 180, "Degrees from the crosshair (180 = all around you)"),
-			D("rage.priority", "Priority", { "Crosshair", "Distance", "Lowest HP", "Highest HP" }, "How to choose between several targets"),
+			D("rage.mode", "Activation", MODES, "Hold, toggle, or always"),
+			S("rage.fov", "Rage FOV", 5, 180, 180, "Degrees (180 = all around)"),
+			D("rage.priority", "Priority", { "Crosshair", "Distance", "Lowest HP", "Highest HP" }, "Target ranking"),
 			S("rage.maxdist", "Max Distance", 50, 3000, 2000, "Studs"),
+			T("rage.suspendrange", "Suspend In Range", true, "Pause while in shooting range / practice"),
 		} },
 		{ name = "Hitscan", rows = {
-			D("rage.bone", "Hit Part", { "Hitscan", "Head", "Torso" }, "Hitscan: head first, then body, then limbs, first visible wins"),
+			D("rage.bone", "Hit Part", { "Hitscan", "Head", "Torso" }, "Hitscan: head then body then limbs"),
 			T("rage.wall", "Wall Check", true, "Only lock onto visible parts"),
 			T("rage.team", "Team Check", true, "Ignore teammates"),
-			T("rage.hpcheck", "Health Check", true, "Skip dead targets and targets with a ForceField"),
-			S("rage.pred", "Prediction", 0, 0.3, 0, "Leads moving targets (seconds of velocity)", 0.01),
-			T("rage.autofire", "Auto Fire", true, "Activates your equipped Tool whenever a target is locked"),
+			T("rage.hpcheck", "Health Check", true, "Skip dead / forcefield"),
+			S("rage.pred", "Prediction", 0, 0.3, 0, "Lead moving targets (seconds)", 0.01),
+			T("rage.autofire", "Auto Fire", true, "Fire while locked"),
 			S("rage.firerate", "Fire Delay (ms)", 20, 1000, 100, "Minimum time between shots"),
 		} },
 		{ name = "Anti-Aim", rows = {
-			D("rage.aa", "Anti-Aim", { "Off", "Spin", "Jitter", "Backwards" }, "Rotates your character while the ragebot is enabled"),
+			D("rage.aa", "Anti-Aim", { "Off", "Spin", "Jitter", "Backwards" }, "Rotate character while rage is on"),
 			S("rage.aaspeed", "Spin Speed", 60, 2000, 720, "Degrees per second"),
-			S("rage.aajit", "Jitter Angle", 10, 180, 90, "Degrees either side of your view"),
+			S("rage.aajit", "Jitter Angle", 10, 180, 90, "Degrees either side"),
 		} },
 	} },
 	{ title = "FOV", col = 2, rows = {
@@ -2529,7 +2603,7 @@ buildPage("Combat", {
 		T("trig.hpcheck", "Health Check", true, "Skip dead targets and targets with a ForceField"),
 	} },
 	{ title = "Hitbox", col = 1, rows = {
-		T("hb.enabled", "Hitbox Expander", false, "Enlarges enemy root parts on YOUR client only"),
+		T("hb.enabled", "Hitbox Expander", false, "Client-side part size only. In the full place, shots use server rays — this will NOT help you hit people there"),
 		S("hb.size", "Hitbox Size", 2, 20, 6, "Studs"),
 		S("hb.trans", "Transparency", 0, 1, 0.7, "Hitbox visibility", 0.05),
 		T("hb.team", "Include Teammates", false, "Also expand teammates"),
@@ -2620,9 +2694,9 @@ buildPage("Visuals", {
 		S("vis.opacity", "UI Opacity", 40, 100, 100, "Card opacity"),
 	} },
 	{ title = "Colors", col = 2, rows = {
-		D("vis.preset", "Theme Preset", { "Lilac", "Rose", "Violet", "Ice", "Mint", "Amber" }, "Applies a color pair"),
-		C("vis.accent", "Accent Color", Presets.Lilac[1], "Primary accent"),
-		C("vis.accent2", "Secondary Accent", Presets.Lilac[2], "Secondary accent"),
+		D("vis.preset", "Theme Preset", { "Rose", "Violet", "Ice", "Mint", "Amber" }, "Applies a color pair"),
+		C("vis.accent", "Accent Color", Presets.Rose[1], "Primary accent"),
+		C("vis.accent2", "Secondary Accent", Presets.Rose[2], "Secondary accent"),
 	} },
 	{ title = "HUD", col = 2, rows = {
 		T("vis.watermark", "Watermark", true, "Name, FPS and ping, top left"),
@@ -2733,7 +2807,7 @@ buildPage("Misc", {
 			end
 		end, "Apply the selected named config"),
 		B("New Config Name", "Create", function()
-			local sg = create("ScreenGui", { Name = "LilacCfgName", ResetOnSpawn = false, DisplayOrder = 3000 }, playerGui)
+			local sg = create("ScreenGui", { Name = "RoseCfgName", ResetOnSpawn = false, DisplayOrder = 3000 }, playerGui)
 			local f = create("Frame", {
 				BackgroundColor3 = Theme.Card, AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(380, 130), BorderSizePixel = 0,
@@ -2775,11 +2849,11 @@ buildPage("Misc", {
 	} },
 	{ title = "Startup", col = 2, rows = {
 		T("misc.notify", "Notifications", true, "Show toast messages"),
-		T("misc.loadnotify", "Load Toast", true, "Toast when Lilac finishes loading"),
+		T("misc.loadnotify", "Load Toast", true, "Toast when Rose finishes loading"),
 		T("misc.silentload", "Silent Load", false, "Skip load toast"),
 		T("misc.tpautoload", "Reload After TP", true, "Re-inject after teleport (uses GitHub URL if set)"),
 		B("TP / Script URL", "Set", function()
-			local sg = create("ScreenGui", { Name = "LilacTpUrlPrompt", ResetOnSpawn = false, DisplayOrder = 3000 }, playerGui)
+			local sg = create("ScreenGui", { Name = "RoseTpUrlPrompt", ResetOnSpawn = false, DisplayOrder = 3000 }, playerGui)
 			local f = create("Frame", {
 				BackgroundColor3 = Theme.Card, AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(440, 150), BorderSizePixel = 0,
@@ -2809,12 +2883,12 @@ buildPage("Misc", {
 		T("misc.togglenotify", "Module Toasts", false, "Toast when modules toggle"),
 		T("misc.tips", "Tooltips", true, "Hover tips", "PC"),
 		B("Skin Changer", "Open", function()
-			if not lilacFullGame then
+			if not roseFullGame then
 				notify("Skin Changer", "Only available in the full-feature place")
 				return
 			end
-			if shared.LilacCosmeticChanger and shared.LilacCosmeticChanger.Toggle then
-				shared.LilacCosmeticChanger.Toggle()
+			if shared.RoseCosmeticChanger and shared.RoseCosmeticChanger.Toggle then
+				shared.RoseCosmeticChanger.Toggle()
 				notify("Skin Changer", "Toggled")
 			else
 				notify("Skin Changer", "Not available yet")
@@ -2849,10 +2923,10 @@ buildPage("Settings", {
 			end)
 		end, "Reset every setting", true),
 		B("Unload Interface", "Unload", function()
-			confirm("Unload Lilac?", "This removes the menu and turns every feature off.", function()
+			confirm("Unload Rose?", "This removes the menu and turns every feature off.", function()
 				unload()
 			end)
-		end, "Remove Lilac completely"),
+		end, "Remove Rose completely"),
 	} },
 })
 
@@ -3005,7 +3079,7 @@ end
 
 local prevMouseIcon = UserInputService.MouseIconEnabled
 local cursorHidden = false
-RunService:BindToRenderStep("LilacMouse", Enum.RenderPriority.Last.Value + 2, function()
+RunService:BindToRenderStep("RoseMouse", Enum.RenderPriority.Last.Value + 2, function()
 	local pcMenu = Menu.open and activePlat == "PC"
 	if pcMenu then UserInputService.MouseBehavior = Enum.MouseBehavior.Default end
 	local show = pcMenu and Settings["set.cursor"] ~= false
@@ -3024,7 +3098,7 @@ RunService:BindToRenderStep("LilacMouse", Enum.RenderPriority.Last.Value + 2, fu
 	end
 end)
 table.insert(cleanups, function()
-	RunService:UnbindFromRenderStep("LilacMouse")
+	RunService:UnbindFromRenderStep("RoseMouse")
 	if cursorHidden then UserInputService.MouseIconEnabled = prevMouseIcon end
 end)
 
@@ -3062,7 +3136,7 @@ Hooks.setOpen = setMenuOpen
 -- floating open/close button (mobile only)
 if isMobile then
 	local mt = create("TextButton", {
-		Name = "LilacToggle",
+		Name = "RoseToggle",
 		Text = "L",
 		Font = HEAD,
 		TextSize = 20,
@@ -3090,7 +3164,7 @@ padHint.Visible = false
 
 -- live platform switching: rows for other platforms hide themselves
 Hooks.platform = function()
-	pSub.Text = "Lilac Premium  ·  " .. (lilacFullGame and "FULL" or "UNI") .. "  ·  " .. activePlat
+	pSub.Text = "Rose  ·  " .. (roseFullGame and "FULL" or "UNI") .. "  ·  " .. activePlat
 	applySearch(pages[currentTab], searchBox.Text)
 	padHint.Visible = activePlat == "Console" and Settings["set.hints"] ~= false
 	if Menu.open and activePlat == "Console" and not GuiService.SelectedObject then
@@ -3108,8 +3182,8 @@ Handlers["set.hints"] = function() if Hooks.platform and pages.Combat then Hooks
 
 -- menu key (universal bind) + controller Select fallback
 connect(UserInputService.InputBegan, function(i)
-	if _G.__LilacBinding or UserInputService:GetFocusedTextBox() then return end
-	if os.clock() - (_G.__LilacBindTime or 0) < 0.3 then return end
+	if _G.__RoseBinding or UserInputService:GetFocusedTextBox() then return end
+	if os.clock() - (_G.__RoseBindTime or 0) < 0.3 then return end
 	if matchesBind(i, Settings["set.menukey"]) or i.KeyCode == Enum.KeyCode.ButtonSelect then
 		setMenuOpen(not Menu.open)
 	end
@@ -3117,7 +3191,7 @@ end)
 
 -- controller navigation: LB/RB tabs, B back, X/Y nudge the selected slider
 connect(UserInputService.InputBegan, function(i)
-	if not Menu.open or _G.__LilacBinding then return end
+	if not Menu.open or _G.__RoseBinding then return end
 	if i.UserInputType.Name:sub(1, 7) ~= "Gamepad" then return end
 	local kc = i.KeyCode
 	if kc == Enum.KeyCode.ButtonR1 or kc == Enum.KeyCode.ButtonL1 then
@@ -3287,7 +3361,7 @@ local function modeActive(p)
 	return bindDown(Settings[p .. ".key"]) or touchHeld[p]
 end
 connect(UserInputService.InputBegan, function(i)
-	if _G.__LilacBinding or typing() or Menu.open then return end
+	if _G.__RoseBinding or typing() or Menu.open then return end
 	for p in pairs(toggled) do
 		if Settings[p .. ".mode"] == "Toggle" and matchesBind(i, Settings[p .. ".key"]) then
 			toggled[p] = not toggled[p]
@@ -3686,9 +3760,9 @@ end
 							hideEsp(o)
 						else
 							local okU, errU = pcall(updateEsp, plr, o, t)
-							if not okU and not _G.__LilacEspWarned then
-								_G.__LilacEspWarned = true
-								warn("[Lilac] ESP error: " .. tostring(errU))
+							if not okU and not _G.__RoseEspWarned then
+								_G.__RoseEspWarned = true
+								warn("[Rose] ESP error: " .. tostring(errU))
 							end
 						end
 					end
@@ -3784,8 +3858,12 @@ end
 		local ray = cam:ViewportPointToRay(ref.X, ref.Y).Direction.Unit
 		local camPos = cam.CFrame.Position
 		local maxD = S[p .. ".maxdist"]
+		if p == "silent" and S["silent.limitdist"] == false then maxD = 1e9 end
 		local pred = S[p .. ".pred"] or S["aim.pred"] or 0
-		local mode = S[p .. ".bone"]
+		if p == "silent" and S["silent.visible"] ~= nil then
+			S["silent.wall"] = S["silent.visible"]
+		end
+		local mode = S[p .. ".bone"] or S[p .. ".part"] or "Head"
 		local prio = S[p .. ".priority"]
 		if p == "silent" and mode == "Closest" then mode = "Hitscan" end
 		if p == "silent" and type(S["silent.headchance"]) == "number" then
@@ -3854,8 +3932,8 @@ end
 
 		local p
 		if combatAllowed() and not typing() and not fc.on and not inLobby() then
-			if lilacFullGame and S["rage.enabled"] and modeActive("rage") then p = "rage"
-			elseif lilacFullGame and S["silent.enabled"] and modeActive("silent") then p = "silent"
+			if roseFullGame and S["rage.enabled"] and modeActive("rage") then p = "rage"
+			elseif roseFullGame and S["silent.enabled"] and modeActive("silent") then p = "silent"
 			elseif S["aim.enabled"] and modeActive("aim") then p = "aim" end
 		end
 		if not p then
@@ -3874,8 +3952,9 @@ end
 		else
 			-- map silent settings into findTarget keys via temporary aliases
 			if p == "silent" then
-				S["silent.bone"] = S["silent.bone"]
+				S["silent.bone"] = S["silent.part"] or S["silent.bone"] or "Head"
 				S["silent.pred"] = S["aim.pred"] or 0
+				S["silent.wall"] = S["silent.visible"] ~= false
 			end
 			target, plr = findTarget(p == "silent" and "silent" or p, fovDeg)
 			-- reaction delay for silent / aim
@@ -4011,11 +4090,11 @@ end
 			end
 		end
 	end
-	RunService:BindToRenderStep("LilacAimE", Enum.RenderPriority.Camera.Value + 1, function() aimStep("Early") end)
-	RunService:BindToRenderStep("LilacAimL", Enum.RenderPriority.Last.Value, function() aimStep("Late") end)
+	RunService:BindToRenderStep("RoseAimE", Enum.RenderPriority.Camera.Value + 1, function() aimStep("Early") end)
+	RunService:BindToRenderStep("RoseAimL", Enum.RenderPriority.Last.Value, function() aimStep("Late") end)
 	table.insert(cleanups, function()
-		RunService:UnbindFromRenderStep("LilacAimE")
-		RunService:UnbindFromRenderStep("LilacAimL")
+		RunService:UnbindFromRenderStep("RoseAimE")
+		RunService:UnbindFromRenderStep("RoseAimL")
 	end)
 
 	-- FOV circle (always drawn, menu open or not) --------------------------------------------
@@ -4147,8 +4226,8 @@ end
 
 		local klDefs = {
 			{ "Aimbot", "aim.enabled", "aim" },
-			lilacFullGame and { "Silent", "silent.enabled", "silent" } or nil,
-			lilacFullGame and { "Ragebot", "rage.enabled", "rage" } or nil,
+			roseFullGame and { "Silent", "silent.enabled", "silent" } or nil,
+			roseFullGame and { "Ragebot", "rage.enabled", "rage" } or nil,
 			{ "Triggerbot", "trig.enabled", "trig" },
 			{ "Fly", "mv.fly" }, { "Speed", "mv.speed" }, { "Noclip", "mv.noclip" },
 			{ "Inf Jump", "mv.infjump" }, { "Hitbox", "hb.enabled" }, { "ESP", "live.esp" },
@@ -4246,7 +4325,7 @@ end
 				if okP and pv then pingTxt = tostring(math.floor(pv + 0.5)) end
 				local ac = hexOf(Theme.Accent)
 				wmLbl.Text = string.format(
-					'<font color="%s">Lilac</font>  |  %s  |  %d fps  |  %s ms',
+					'<font color="%s">Rose</font>  |  %s  |  %d fps  |  %s ms',
 					ac, player.DisplayName, math.floor(fpsSmooth + 0.5), pingTxt
 				)
 				wmStroke.Color = Theme.Accent
@@ -4314,14 +4393,14 @@ end
 	setupHud()
 
 	-- one render-step pass after the camera and the aimbot so everything lines up with the final view
-	RunService:BindToRenderStep("LilacVisuals", Enum.RenderPriority.Last.Value + 1, function()
+	RunService:BindToRenderStep("RoseVisuals", Enum.RenderPriority.Last.Value + 1, function()
 		Steps.esp()
 		Steps.fov()
 		Steps.trig()
 		Steps.hud()
 		Steps.hit()
 	end)
-	table.insert(cleanups, function() RunService:UnbindFromRenderStep("LilacVisuals") end)
+	table.insert(cleanups, function() RunService:UnbindFromRenderStep("RoseVisuals") end)
 
 	local function setupRest()
 	-- hitbox expander (client-side only) ---------------------------------------------------------
@@ -4383,38 +4462,38 @@ end
 	local function fxStep()
 		local S = Settings
 		local want = (Menu.open and S["fx.menublur"]) and 18 or 0
-		local blur = fxObjs["LilacBlur"]
-		if want > 0 then blur = fxGet("BlurEffect", "LilacBlur") end
+		local blur = fxObjs["RoseBlur"]
+		if want > 0 then blur = fxGet("BlurEffect", "RoseBlur") end
 		if blur then
 			blur.Size = blur.Size + (want - blur.Size) * 0.2
-			if want == 0 and blur.Size < 0.2 then fxDrop("LilacBlur") end
+			if want == 0 and blur.Size < 0.2 then fxDrop("RoseBlur") end
 		end
 		if S["fx.bloom"] then
-			local b = fxGet("BloomEffect", "LilacBloom")
+			local b = fxGet("BloomEffect", "RoseBloom")
 			b.Intensity, b.Size, b.Threshold = S["fx.bloomint"], 24, 0.9
 		else
-			fxDrop("LilacBloom")
+			fxDrop("RoseBloom")
 		end
 		if S["fx.cc"] then
-			local c = fxGet("ColorCorrectionEffect", "LilacCC")
+			local c = fxGet("ColorCorrectionEffect", "RoseCC")
 			c.Saturation, c.Contrast, c.Brightness, c.TintColor = S["fx.sat"], S["fx.con"], S["fx.bri"], S["fx.tint"]
 		else
-			fxDrop("LilacCC")
+			fxDrop("RoseCC")
 		end
 		if S["fx.rays"] then
-			local r = fxGet("SunRaysEffect", "LilacRays")
+			local r = fxGet("SunRaysEffect", "RoseRays")
 			r.Intensity, r.Spread = S["fx.raysint"], 0.8
 		else
-			fxDrop("LilacRays")
+			fxDrop("RoseRays")
 		end
 		if S["fx.atmo"] then
-			local atm = Lighting:FindFirstChildOfClass("Atmosphere") or fxGet("Atmosphere", "LilacAtmo")
+			local atm = Lighting:FindFirstChildOfClass("Atmosphere") or fxGet("Atmosphere", "RoseAtmo")
 			ovSet("atmo", atm, "Density", S["fx.density"])
 			ovSet("atmo", atm, "Haze", S["fx.haze"])
 			ovSet("atmo", atm, "Color", S["fx.atmocolor"])
 		elseif ovr.atmo then
 			ovRestore("atmo")
-			fxDrop("LilacAtmo")
+			fxDrop("RoseAtmo")
 		end
 	end
 
@@ -4428,7 +4507,7 @@ end
 		if not weatherPart or not weatherPart.Parent or weatherKind ~= kind then
 			if weatherPart then weatherPart:Destroy() end
 			weatherPart = create("Part", {
-				Name = "LilacWeather", Anchored = true, CanCollide = false, CanQuery = false, CanTouch = false,
+				Name = "RoseWeather", Anchored = true, CanCollide = false, CanQuery = false, CanTouch = false,
 				Transparency = 1, Size = Vector3.new(70, 1, 70),
 			}, workspace)
 			weatherEm = create("ParticleEmitter", { EmissionDirection = Enum.NormalId.Bottom }, weatherPart)
@@ -4478,7 +4557,7 @@ end
 		if not fc.on then return end
 		fc.on = false
 		cam.CameraType = fc.prevType or Enum.CameraType.Custom
-		CAS:UnbindAction("LilacFreecam")
+		CAS:UnbindAction("RoseFreecam")
 		fc.s1, fc.s2 = Vector2.zero, Vector2.zero
 	end
 	table.insert(cleanups, fcStop)
@@ -4495,7 +4574,7 @@ end
 			fc.pos = cam.CFrame.Position
 			fc.pitch, fc.yaw = cam.CFrame:ToOrientation()
 			cam.CameraType = Enum.CameraType.Scriptable
-			CAS:BindActionAtPriority("LilacFreecam", function() return Enum.ContextActionResult.Sink end, false, 3000,
+			CAS:BindActionAtPriority("RoseFreecam", function() return Enum.ContextActionResult.Sink end, false, 3000,
 				Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.E, Enum.KeyCode.Q,
 				Enum.KeyCode.Space, Enum.KeyCode.LeftShift, Enum.KeyCode.Thumbstick1)
 		end
@@ -4686,18 +4765,35 @@ end
 			end
 		end
 
-		-- hitboxes
+		-- hitboxes (client visual / local ray only — full place ignores this for damage)
 		if S["hb.enabled"] then
+			local sz = S["hb.size"]
+			local tr = S["hb.trans"]
 			for _, plr in ipairs(Players:GetPlayers()) do
 				if plr ~= lp and (S["hb.team"] or not sameTeam(plr)) then
 					local c, _, ok = alive(plr)
-					local r = c and c:FindFirstChild("HumanoidRootPart")
-					if r and ok then
-						origSizes[r] = origSizes[r] or { size = r.Size, trans = r.Transparency, collide = r.CanCollide }
-						r.Size = Vector3.new(S["hb.size"], S["hb.size"], S["hb.size"])
-						r.Transparency, r.CanCollide = S["hb.trans"], false
+					if c and ok then
+						for _, name in ipairs({ "HumanoidRootPart", "Head", "UpperTorso", "Torso" }) do
+							local r = c:FindFirstChild(name)
+							if r and r:IsA("BasePart") then
+								if not origSizes[r] then
+									origSizes[r] = { size = r.Size, trans = r.Transparency, collide = r.CanCollide }
+								end
+								local o = origSizes[r]
+								-- scale from original so we never stack grow
+								local base = o.size
+								local scale = sz / math.max(base.X, base.Y, base.Z, 0.1)
+								r.Size = base * math.clamp(scale, 1, 12)
+								r.Transparency = tr
+								r.CanCollide = false
+							end
+						end
 					end
 				end
+			end
+			-- drop entries for destroyed parts
+			for part in pairs(origSizes) do
+				if not part.Parent then origSizes[part] = nil end
 			end
 		elseif next(origSizes) then
 			restoreHitboxes()
@@ -4807,13 +4903,13 @@ end
 
 
 -- export combat state for premium hooks
-shared.LilacTrack = Track
-shared.LilacInLobby = inLobby
+shared.RoseTrack = Track
+shared.RoseInLobby = inLobby
 
 end -- features scope
 
 --------------------------------------------------------------------------
--- Lilac Premium combat engine (game-aware silent + rage)
+-- Rose combat engine (game-aware silent + rage)
 -- Uses camera/mouse assist everywhere; upgrades to shot redirection when
 -- the place exposes fighter remotes / enum modules.
 --------------------------------------------------------------------------
@@ -4847,62 +4943,102 @@ do
 		return { util = util, enums = enums, useItem = useItem, fighter = fctrl }
 	end
 
-	-- Install once: redirect fire camera data toward silent/rage target
+	-- Install once: redirect fire camera data toward silent/rage target.
+	-- CRITICAL: always forward with (self, ...) when not modifying — table.unpack
+	-- drops/corrupts args and was blocking all damage in the full place.
 	task.spawn(function()
-		if not lilacFullGame then return end
+		if not roseFullGame then return end
 		task.wait(1)
 		local M = getFighterModules()
 		if not M or not hookfunction or not newcclosure then return end
 		local enums, remote = M.enums, M.useItem
 		if typeof(remote) ~= "Instance" or not remote:IsA("RemoteEvent") then return end
+
+		local startShootEnum
 		pcall(function()
-			if enums and enums.ToEnum then enums:ToEnum("StartShooting") end
+			if enums and enums.ToEnum then
+				startShootEnum = enums:ToEnum("StartShooting")
+			end
 		end)
+
 		local old
 		local ok = pcall(function()
-			old = hookfunction(remote.FireServer, newcclosure(function(self, ...)
-				local args = { ... }
-				if Settings["silent.enabled"] or Settings["rage.enabled"] then
-					local Tr = shared.LilacTrack
-					local lobbyFn = shared.LilacInLobby
-					if type(lobbyFn) == "function" and lobbyFn() then
-						return old(self, ...)
-					end
-					local part = Tr and Tr.part
-					local mode = Tr and Tr.mode
-					local want = (Settings["rage.enabled"] and mode == "rage")
-						or (Settings["silent.enabled"] and (mode == "silent" or mode == "aim" or mode == "rage"))
-					if want and part and part.Parent and typeof(args[3]) == "table" then
-						local origin = workspace.CurrentCamera and workspace.CurrentCamera.CFrame.Position
-						if origin then
-							local dest = part.Position
-							pcall(function()
-								dest = dest + part.AssemblyLinearVelocity * (Settings["aim.pred"] or 0)
-							end)
-							local dir = (dest - origin)
-							if dir.Magnitude > 0.01 then
-								dir = dir.Unit
-								args[3].LookVector = dir
-								args[3].lookVector = dir
-								args[3].Origin = origin
-								args[3].Position = origin
-								local cf = CFrame.lookAt(origin, origin + dir)
-								args[3].CFrame = cf
-								args[3].CameraCFrame = cf
-							end
-						end
-					end
+			old = hookfunction(remote.FireServer, newcclosure(function(self, obj, action, cameradata, ...)
+				-- Default: never touch the call (preserves damage)
+				local silentOn = Settings["silent.enabled"] == true
+				local rageOn = Settings["rage.enabled"] == true
+				if not silentOn and not rageOn then
+					return old(self, obj, action, cameradata, ...)
 				end
-				return old(self, table.unpack(args))
+
+				local lobbyFn = shared.RoseInLobby
+				if type(lobbyFn) == "function" and lobbyFn() then
+					return old(self, obj, action, cameradata, ...)
+				end
+
+				-- Only rewrite StartShooting packets when we have a live target
+				local isShoot = true
+				if startShootEnum ~= nil and action ~= nil then
+					isShoot = (action == startShootEnum)
+				end
+				if not isShoot then
+					return old(self, obj, action, cameradata, ...)
+				end
+
+				local Tr = shared.RoseTrack
+				local part = Tr and Tr.part
+				local mode = Tr and Tr.mode
+				local want = (rageOn and mode == "rage")
+					or (silentOn and (mode == "silent" or mode == "aim" or mode == "rage"))
+				if not want or not part or not part.Parent or typeof(cameradata) ~= "table" then
+					return old(self, obj, action, cameradata, ...)
+				end
+				local hc = Settings["silent.hitchance"]
+				if type(hc) == "number" and hc < 100 and math.random(1, 100) > hc then
+					return old(self, obj, action, cameradata, ...)
+				end
+
+				local cam = workspace.CurrentCamera
+				local origin = cam and cam.CFrame.Position
+				if not origin then
+					return old(self, obj, action, cameradata, ...)
+				end
+
+				local dest = part.Position
+				pcall(function()
+					dest = dest + part.AssemblyLinearVelocity * (Settings["aim.pred"] or 0)
+				end)
+				local dir = dest - origin
+				if dir.Magnitude < 0.05 then
+					return old(self, obj, action, cameradata, ...)
+				end
+				dir = dir.Unit
+
+				-- Clone table so we do not mutate shared refs the game reuses
+				local cd = {}
+				for k, v in pairs(cameradata) do
+					cd[k] = v
+				end
+				local cf = CFrame.lookAt(origin, origin + dir)
+				cd.CFrame = cf
+				cd.CameraCFrame = cf
+				cd.LookVector = dir
+				cd.lookVector = dir
+				if cd.Origin ~= nil then cd.Origin = origin end
+				if cd.Position ~= nil then cd.Position = origin end
+
+				return old(self, obj, action, cd, ...)
 			end))
 		end)
-		if ok then
+		if ok and old then
 			Premium.silentHook = true
 			table.insert(cleanups, function()
 				pcall(function()
 					if old then hookfunction(remote.FireServer, old) end
 				end)
 			end)
+		else
+			warn("[Rose] fire hook not installed — shots use normal aim")
 		end
 	end)
 end
@@ -4934,7 +5070,7 @@ renderPreview()
 updatePreviewVisible()
 
 -- Universal mode: force off full-only combat
-if not lilacFullGame then
+if not roseFullGame then
 	Settings["silent.enabled"] = false
 	Settings["rage.enabled"] = false
 	-- keep them off if a config tries to re-enable
@@ -4967,7 +5103,7 @@ do
 		end
 	end
 	-- configs must not enable full-only modules in universal places
-	if not lilacFullGame then
+	if not roseFullGame then
 		Settings["silent.enabled"] = false
 		Settings["rage.enabled"] = false
 	end
@@ -4986,7 +5122,7 @@ do
 			or queueonteleport
 		if type(q) ~= "function" then return end
 		local src = string.format(
-			"local u=%q; local ok,err=pcall(function() loadstring(game:HttpGet(u))() end); if not ok then warn('[Lilac] TP reload failed',err) end",
+			"local u=%q; local ok,err=pcall(function() loadstring(game:HttpGet(u))() end); if not ok then warn('[Rose] TP reload failed',err) end",
 			url
 		)
 		pcall(q, src)
@@ -5001,15 +5137,15 @@ do
 	task.defer(queueReload)
 end
 
-print("[Lilac Premium] loaded")
+print("[Rose] loaded")
 if not Settings["misc.silentload"] and Settings["misc.loadnotify"] ~= false and Settings["misc.notify"] ~= false then
-	local mode = lilacFullGame and "FULL mode · silent + rage + skins" or "UNIVERSAL mode · aimbot + shared features"
-	notify("Lilac Premium", mode .. " · " .. prettyKey(Settings["set.menukey"]) .. " toggles menu")
+	local mode = roseFullGame and "FULL mode · silent + rage + skins" or "UNIVERSAL mode · aimbot + shared features"
+	notify("Rose", mode .. " · " .. prettyKey(Settings["set.menukey"]) .. " toggles menu")
 end
 
 
 --------------------------------------------------------------------------
--- Lilac Premium · Skin / Cosmetic Changer
+-- Rose · Skin / Cosmetic Changer
 -- Activates when the current game exposes item/cosmetic modules.
 --------------------------------------------------------------------------
 do
@@ -5028,22 +5164,22 @@ do
 				table.insert(self.Connections, { Disconnect = conn })
 			end
 		end
-		shared.__LilacSkinMainapi = mainapi
+		shared.__RoseSkinMainapi = mainapi
 	end
 
-	-- Prefer Lilac HUD/playerGui for parenting the cosmetic window
+	-- Prefer Rose HUD/playerGui for parenting the cosmetic window
 	local function ensureSkinGuiParent()
 		if mainapi.MainScreenGui and mainapi.MainScreenGui.Parent then
 			return mainapi.MainScreenGui
 		end
 		local pg = game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
-		local existing = pg and pg:FindFirstChild("LilacSkinChangerGui")
+		local existing = pg and pg:FindFirstChild("RoseSkinChangerGui")
 		if existing then
 			mainapi.MainScreenGui = existing
 			return existing
 		end
 		local sg = Instance.new("ScreenGui")
-		sg.Name = "LilacSkinChangerGui"
+		sg.Name = "RoseSkinChangerGui"
 		sg.ResetOnSpawn = false
 		sg.IgnoreGuiInset = true
 		sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -5091,7 +5227,7 @@ do
 		end
 	end
 
-	-- keep ClickGuiStatus in sync with Lilac menu if present
+	-- keep ClickGuiStatus in sync with Rose menu if present
 	task.spawn(function()
 		while true do
 			task.wait(0.15)
@@ -8675,7 +8811,7 @@ local function makeCosmeticChanger()
 	rebuildCosmeticLists()
 
 	local gui = Instance.new("Frame")
-	gui.Name = "LilacCosmeticChanger"
+	gui.Name = "RoseCosmeticChanger"
 	gui.BackgroundColor3 = Theme.Bg
 	gui.BorderSizePixel = 0
 	gui.Position = UDim2.new(0.5, -410, 0.5, -420)
@@ -8699,7 +8835,7 @@ local function makeCosmeticChanger()
 	title.BackgroundColor3 = Theme.CardHead
 	title.BorderSizePixel = 0
 	title.Font = Enum.Font.GothamBold
-	title.Text = "  Lilac Premium  ·  Skins"
+	title.Text = "  Rose  ·  Skins"
 	title.TextColor3 = Theme.Text
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.TextSize = 15
@@ -9183,8 +9319,8 @@ local function makeCosmeticChanger()
 	end)
 	close.MouseButton1Click:Connect(function()
 		cosmeticGuiState.Wanted = false
-		if shared.LilacCosmeticChangerToggle and shared.LilacCosmeticChangerToggle.Toggle then
-			shared.LilacCosmeticChangerToggle:Toggle(false)
+		if shared.RoseCosmeticChangerToggle and shared.RoseCosmeticChangerToggle.Toggle then
+			shared.RoseCosmeticChangerToggle:Toggle(false)
 		else
 			gui.Visible = false
 		end
@@ -9208,7 +9344,7 @@ local function makeCosmeticChanger()
 	return gui
 end
 
-shared.LilacCosmeticChanger = {
+shared.RoseCosmeticChanger = {
 	SetVisible = function(visible)
 		cosmeticGuiState.Wanted = visible == true
 		makeCosmeticChanger()
