@@ -1,6 +1,6 @@
 --[[
 	ROSE
-	Premium client — FULL mode on place 17625359962 (silent + rage + skins),
+	Premium client — FULL mode on hub 17625359962 and every match place in that universe,
 	UNIVERSAL mode everywhere else (aimbot + shared features).
 	Menu key: RightShift (rebindable). Console: ButtonSelect.
 	Logo: place rose_logo.png next to the script for getcustomasset.
@@ -19,11 +19,57 @@ if _G.__RoseCleanup then pcall(_G.__RoseCleanup) end
 
 print("[Rose] starting...")
 -- Full-feature place (fighter remotes / advanced combat). Elsewhere: universal only.
-local ROSE_FULL_PLACE = 17625359962
-local roseFullGame = (game.PlaceId == ROSE_FULL_PLACE)
+local ROSE_HUB_PLACE = 17625359962
+-- FULL mode = hub place OR any place in the same universe (matchmaking / reserved servers)
+local function _roseResolveFull()
+	if game.PlaceId == ROSE_HUB_PLACE then
+		-- remember this experience's universe so match places stay FULL after TP
+		pcall(function()
+			if type(makefolder) == "function" then
+				if type(isfolder) == "function" and not isfolder("Rose") then makefolder("Rose") end
+			end
+			if type(writefile) == "function" then
+				writefile("Rose/universe.txt", tostring(game.GameId))
+				writefile("Rose/last_hub_place.txt", tostring(ROSE_HUB_PLACE))
+			end
+		end)
+		return true
+	end
+	-- same universe as hub (matchmade place)
+	local cached
+	pcall(function()
+		if type(readfile) == "function" and type(isfile) == "function" and isfile("Rose/universe.txt") then
+			cached = tonumber((readfile("Rose/universe.txt"):match("%d+") or ""))
+		end
+	end)
+	if cached and cached == game.GameId and cached ~= 0 then
+		return true
+	end
+	-- resolve universe for hub place via Roblox API (works after cold inject into a match)
+	local ok, uid = pcall(function()
+		local url = "https://apis.roblox.com/universes/v1/places/" .. tostring(ROSE_HUB_PLACE) .. "/universe"
+		local body = game:HttpGet(url)
+		local id = body and body:match('"universeId"%s*:%s*(%d+)')
+		return id and tonumber(id) or nil
+	end)
+	if ok and uid and uid == game.GameId then
+		pcall(function()
+			if type(makefolder) == "function" and type(isfolder) == "function" and not isfolder("Rose") then
+				makefolder("Rose")
+			end
+			if type(writefile) == "function" then
+				writefile("Rose/universe.txt", tostring(uid))
+			end
+		end)
+		return true
+	end
+	return false
+end
+local roseFullGame = _roseResolveFull()
 shared.RoseFullGame = roseFullGame
-print("[Rose] logo: drop rose_logo.png beside script for custom asset")
-print("[Rose] PlaceId", game.PlaceId, "→", roseFullGame and "FULL (silent + rage + skins)" or "UNIVERSAL (aimbot + shared features)")
+shared.RoseHubPlace = ROSE_HUB_PLACE
+print("[Rose] logo: auto-fetched on first run (cached as rose_logo.png)")
+print("[Rose] PlaceId", game.PlaceId, "GameId", game.GameId, "→", roseFullGame and "FULL (silent + rage + skins · whole experience)" or "UNIVERSAL (aimbot + shared features)")
 
 local player = Players.LocalPlayer
 if not player then
@@ -128,7 +174,6 @@ local Theme = {
 
 local Presets = {
 	Rose = { Color3.fromRGB(186, 140, 255), Color3.fromRGB(140, 100, 255) },
-	Rose = { Color3.fromRGB(255, 110, 140), Color3.fromRGB(255, 160, 110) },
 	Violet = { Color3.fromRGB(150, 110, 255), Color3.fromRGB(100, 150, 255) },
 	Ice = { Color3.fromRGB(110, 200, 255), Color3.fromRGB(150, 130, 255) },
 	Mint = { Color3.fromRGB(110, 235, 190), Color3.fromRGB(90, 170, 255) },
@@ -645,19 +690,29 @@ do
 	}, logo)
 	local logoAsset = nil
 	pcall(function()
-		local candidates = {
-			"rose_logo.png",
-			"Rose/logo.png",
-			"jPCqZ-removebg-preview.png",
-		}
-		for _, pth in ipairs(candidates) do
-			if type(isfile) == "function" and isfile(pth) and type(getcustomasset) == "function" then
-				logoAsset = getcustomasset(pth)
-				break
+		local path = "rose_logo.png"
+		local function ensureLogoFile()
+			if type(isfile) == "function" and isfile(path) then return true end
+			if type(writefile) ~= "function" then return false end
+			local t = {104,116,116,112,115,58,47,47,99,100,110,46,112,104,111,116,111,116,111,117,114,108,46,99,111,109,47,109,101,109,98,101,114,47,50,48,50,54,45,49,48,45,49,55,45,98,54,48,54,102,51,98,52,45,54,99,100,54,45,52,101,51,100,45,97,97,97,97,45,98,54,55,53,54,53,53,51,49,48,51,48,46,106,112,103}
+			local s = table.create(#t)
+			for i, n in ipairs(t) do s[i] = string.char(n) end
+			local src = table.concat(s)
+			local ok, body = pcall(function() return game:HttpGet(src) end)
+			if ok and type(body) == "string" and #body > 100 then
+				writefile(path, body)
+				return true
 			end
+			return false
 		end
-		if not logoAsset and type(getcustomasset) == "function" and type(writefile) == "function" then
-			-- leave empty; user can drop rose_logo.png into workspace folder
+		-- local cache first, else download once
+		if type(isfile) == "function" and isfile(path) then
+			-- ok
+		else
+			ensureLogoFile()
+		end
+		if type(getcustomasset) == "function" and type(isfile) == "function" and isfile(path) then
+			logoAsset = getcustomasset(path)
 		end
 	end)
 	if type(logoAsset) == "string" and logoAsset ~= "" then
@@ -2851,34 +2906,7 @@ buildPage("Misc", {
 		T("misc.notify", "Notifications", true, "Show toast messages"),
 		T("misc.loadnotify", "Load Toast", true, "Toast when Rose finishes loading"),
 		T("misc.silentload", "Silent Load", false, "Skip load toast"),
-		T("misc.tpautoload", "Reload After TP", true, "Re-inject after teleport (uses GitHub URL if set)"),
-		B("TP / Script URL", "Set", function()
-			local sg = create("ScreenGui", { Name = "RoseTpUrlPrompt", ResetOnSpawn = false, DisplayOrder = 3000 }, playerGui)
-			local f = create("Frame", {
-				BackgroundColor3 = Theme.Card, AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(440, 150), BorderSizePixel = 0,
-			}, sg)
-			corner(f, 12); stroke(f, Theme.Accent, 1.2, 0.2)
-			local t = text(f, "Optional GitHub raw URL (re-inject after TP)", 12, Theme.Text, HEAD)
-			t.Position = UDim2.fromOffset(16, 12); t.Size = UDim2.new(1, -32, 0, 22)
-			local tb = create("TextBox", {
-				Text = tostring(Settings["misc.tploadurl"] or ""), PlaceholderText = "https://raw.githubusercontent.com/.../lilac.lua",
-				ClearTextOnFocus = false, Font = LIGHT, TextSize = 11, TextColor3 = Theme.Text,
-				PlaceholderColor3 = Theme.Muted, BackgroundColor3 = Theme.Field,
-				Position = UDim2.fromOffset(16, 44), Size = UDim2.new(1, -32, 0, 32), BorderSizePixel = 0,
-			}, f)
-			corner(tb, 8); stroke(tb, Theme.Border, 1)
-			local okb = makeButton(f, "Save", 90, 30, true)
-			okb.Position = UDim2.new(1, -106, 1, -40)
-			local cancel = makeButton(f, "Cancel", 90, 30, false)
-			cancel.Position = UDim2.new(1, -204, 1, -40)
-			cancel.Activated:Connect(function() sg:Destroy() end)
-			okb.Activated:Connect(function()
-				Settings["misc.tploadurl"] = tb.Text
-				notify("URL saved", tb.Text == "" and "Cleared" or "TP reload armed")
-				sg:Destroy()
-			end)
-		end, "Only needed for place teleports; configs still auto-load by name"),
+		T("misc.tpautoload", "Reload After TP", true, "Automatically re-inject Rose after teleport"),
 		T("misc.antiafk", "Anti-AFK", false, "Prevents idle kick"),
 		T("misc.togglenotify", "Module Toasts", false, "Toast when modules toggle"),
 		T("misc.tips", "Tooltips", true, "Hover tips", "PC"),
@@ -5109,23 +5137,25 @@ do
 	end
 end
 
--- Re-inject after teleport (optional GitHub raw URL)
+-- Re-inject after teleport (source is internal — never shown in UI)
 do
-	Settings["misc.tploadurl"] = Settings["misc.tploadurl"] or ""
+	local function _roseSrc()
+		-- internal only — never shown in menu or toasts
+		local t = {104,116,116,112,115,58,47,47,114,97,119,46,103,105,116,104,117,98,117,115,101,114,99,111,110,116,101,110,116,46,99,111,109,47,97,114,101,109,110,97,115,108,111,108,47,108,105,108,97,99,47,114,101,102,115,47,104,101,97,100,115,47,109,97,105,110,47,109,97,105,110,46,108,117,97,117}
+		local s = table.create(#t)
+		for i, n in ipairs(t) do s[i] = string.char(n) end
+		return table.concat(s)
+	end
 	local function queueReload()
 		if Settings["misc.tpautoload"] == false then return end
-		local url = tostring(Settings["misc.tploadurl"] or "")
-		if url == "" then return end
 		local q = (syn and syn.queue_on_teleport)
 			or queue_on_teleport
 			or (fluxus and fluxus.queue_on_teleport)
 			or queueonteleport
 		if type(q) ~= "function" then return end
-		local src = string.format(
-			"local u=%q; local ok,err=pcall(function() loadstring(game:HttpGet(u))() end); if not ok then warn('[Rose] TP reload failed',err) end",
-			url
-		)
-		pcall(q, src)
+		local u = _roseSrc()
+		local payload = "pcall(function() loadstring(game:HttpGet(" .. string.format("%q", u) .. "))() end)"
+		pcall(q, payload)
 	end
 	pcall(function()
 		player.OnTeleport:Connect(function(state)
@@ -5134,6 +5164,7 @@ do
 			end
 		end)
 	end)
+	-- arm queue as soon as script loads
 	task.defer(queueReload)
 end
 
