@@ -1,6 +1,6 @@
 --[[
 	ROSE
-	Premium client — FULL mode on hub 17625359962 and every match place in that universe,
+	Premium client — always FULL mode (no place/universe gate),
 	UNIVERSAL mode everywhere else (aimbot + shared features).
 	Menu key: RightShift (rebindable). Console: ButtonSelect.
 	Logo: place rose_logo.png next to the script for getcustomasset.
@@ -20,56 +20,12 @@ if _G.__RoseCleanup then pcall(_G.__RoseCleanup) end
 print("[Rose] starting...")
 -- Full-feature place (fighter remotes / advanced combat). Elsewhere: universal only.
 local ROSE_HUB_PLACE = 17625359962
--- FULL mode = hub place OR any place in the same universe (matchmaking / reserved servers)
-local function _roseResolveFull()
-	if game.PlaceId == ROSE_HUB_PLACE then
-		-- remember this experience's universe so match places stay FULL after TP
-		pcall(function()
-			if type(makefolder) == "function" then
-				if type(isfolder) == "function" and not isfolder("Rose") then makefolder("Rose") end
-			end
-			if type(writefile) == "function" then
-				writefile("Rose/universe.txt", tostring(game.GameId))
-				writefile("Rose/last_hub_place.txt", tostring(ROSE_HUB_PLACE))
-			end
-		end)
-		return true
-	end
-	-- same universe as hub (matchmade place)
-	local cached
-	pcall(function()
-		if type(readfile) == "function" and type(isfile) == "function" and isfile("Rose/universe.txt") then
-			cached = tonumber((readfile("Rose/universe.txt"):match("%d+") or ""))
-		end
-	end)
-	if cached and cached == game.GameId and cached ~= 0 then
-		return true
-	end
-	-- resolve universe for hub place via Roblox API (works after cold inject into a match)
-	local ok, uid = pcall(function()
-		local url = "https://apis.roblox.com/universes/v1/places/" .. tostring(ROSE_HUB_PLACE) .. "/universe"
-		local body = game:HttpGet(url)
-		local id = body and body:match('"universeId"%s*:%s*(%d+)')
-		return id and tonumber(id) or nil
-	end)
-	if ok and uid and uid == game.GameId then
-		pcall(function()
-			if type(makefolder) == "function" and type(isfolder) == "function" and not isfolder("Rose") then
-				makefolder("Rose")
-			end
-			if type(writefile) == "function" then
-				writefile("Rose/universe.txt", tostring(uid))
-			end
-		end)
-		return true
-	end
-	return false
-end
-local roseFullGame = _roseResolveFull()
+-- Always FULL mode (no place / universe check)
+local roseFullGame = true
 shared.RoseFullGame = roseFullGame
 shared.RoseHubPlace = ROSE_HUB_PLACE
 print("[Rose] logo: auto-fetched on first run (cached as rose_logo.png)")
-print("[Rose] PlaceId", game.PlaceId, "GameId", game.GameId, "→", roseFullGame and "FULL (silent + rage + skins · whole experience)" or "UNIVERSAL (aimbot + shared features)")
+print("[Rose] FULL mode (all features · no place gate) · PlaceId", game.PlaceId)
 
 local player = Players.LocalPlayer
 if not player then
@@ -174,6 +130,7 @@ local Theme = {
 
 local Presets = {
 	Rose = { Color3.fromRGB(186, 140, 255), Color3.fromRGB(140, 100, 255) },
+	Blush = { Color3.fromRGB(255, 110, 140), Color3.fromRGB(255, 160, 110) },
 	Violet = { Color3.fromRGB(150, 110, 255), Color3.fromRGB(100, 150, 255) },
 	Ice = { Color3.fromRGB(110, 200, 255), Color3.fromRGB(150, 130, 255) },
 	Mint = { Color3.fromRGB(110, 235, 190), Color3.fromRGB(90, 170, 255) },
@@ -797,7 +754,7 @@ do
 	pName.Position = UDim2.fromOffset(56, 9)
 	pName.Size = UDim2.new(1, -62, 0, 18)
 	pName.TextTruncate = Enum.TextTruncate.AtEnd
-	pSub = text(profile, "Rose  ·  " .. (roseFullGame and "FULL" or "UNI") .. "  ·  " .. activePlat, 10, Theme.Muted, LIGHT)
+	pSub = text(profile, "Rose  ·  " .. "FULL" .. "  ·  " .. activePlat, 10, Theme.Muted, LIGHT)
 	pSub.Position = UDim2.fromOffset(56, 28)
 	pSub.Size = UDim2.new(1, -62, 0, 14)
 	if isMobile then profile.Visible = false; modulesLbl.Visible = false end
@@ -2749,7 +2706,7 @@ buildPage("Visuals", {
 		S("vis.opacity", "UI Opacity", 40, 100, 100, "Card opacity"),
 	} },
 	{ title = "Colors", col = 2, rows = {
-		D("vis.preset", "Theme Preset", { "Rose", "Violet", "Ice", "Mint", "Amber" }, "Applies a color pair"),
+		D("vis.preset", "Theme Preset", { "Rose", "Blush", "Violet", "Ice", "Mint", "Amber" }, "Applies a color pair"),
 		C("vis.accent", "Accent Color", Presets.Rose[1], "Primary accent"),
 		C("vis.accent2", "Secondary Accent", Presets.Rose[2], "Secondary accent"),
 	} },
@@ -2911,10 +2868,6 @@ buildPage("Misc", {
 		T("misc.togglenotify", "Module Toasts", false, "Toast when modules toggle"),
 		T("misc.tips", "Tooltips", true, "Hover tips", "PC"),
 		B("Skin Changer", "Open", function()
-			if not roseFullGame then
-				notify("Skin Changer", "Only available in the full-feature place")
-				return
-			end
 			if shared.RoseCosmeticChanger and shared.RoseCosmeticChanger.Toggle then
 				shared.RoseCosmeticChanger.Toggle()
 				notify("Skin Changer", "Toggled")
@@ -3192,7 +3145,7 @@ padHint.Visible = false
 
 -- live platform switching: rows for other platforms hide themselves
 Hooks.platform = function()
-	pSub.Text = "Rose  ·  " .. (roseFullGame and "FULL" or "UNI") .. "  ·  " .. activePlat
+	pSub.Text = "Rose  ·  " .. "FULL" .. "  ·  " .. activePlat
 	applySearch(pages[currentTab], searchBox.Text)
 	padHint.Visible = activePlat == "Console" and Settings["set.hints"] ~= false
 	if Menu.open and activePlat == "Console" and not GuiService.SelectedObject then
@@ -3959,10 +3912,9 @@ end
 		AS.lastAim = nowT
 
 		local p
+		-- Silent/Rage handled by exact combat port (not this shared aim path)
 		if combatAllowed() and not typing() and not fc.on and not inLobby() then
-			if roseFullGame and S["rage.enabled"] and modeActive("rage") then p = "rage"
-			elseif roseFullGame and S["silent.enabled"] and modeActive("silent") then p = "silent"
-			elseif S["aim.enabled"] and modeActive("aim") then p = "aim" end
+			if S["aim.enabled"] and modeActive("aim") then p = "aim" end
 		end
 		if not p then
 			AS.sticky, AS.stickyPlr, AS.prevTarget = nil, nil, nil
@@ -4936,141 +4888,8 @@ shared.RoseInLobby = inLobby
 
 end -- features scope
 
---------------------------------------------------------------------------
--- Rose combat engine (game-aware silent + rage)
--- Uses camera/mouse assist everywhere; upgrades to shot redirection when
--- the place exposes fighter remotes / enum modules.
---------------------------------------------------------------------------
-do
-	local Premium = {
-		silentHook = false,
-		rageOn = false,
-	}
 
-	local function tryRequire(path)
-		local ok, mod = pcall(require, path)
-		return ok and mod or nil
-	end
-
-	local function getFighterModules()
-		local rs = game:GetService("ReplicatedStorage")
-		local lp = Players.LocalPlayer
-		local mods = rs:FindFirstChild("Modules")
-		local remotes = rs:FindFirstChild("Remotes")
-		if not mods or not remotes then return nil end
-		local util = tryRequire(mods:FindFirstChild("Utility"))
-		local enums = tryRequire(mods:FindFirstChild("EnumLibrary"))
-		local useItem = remotes:FindFirstChild("Replication")
-		useItem = useItem and useItem:FindFirstChild("Fighter")
-		useItem = useItem and useItem:FindFirstChild("UseItem")
-		local scripts = lp and (lp:FindFirstChild("PlayerScripts") or lp:FindFirstChild("PlayerScripts "))
-		local fctrl = scripts and scripts:FindFirstChild("Controllers")
-		fctrl = fctrl and fctrl:FindFirstChild("FighterController")
-		fctrl = fctrl and tryRequire(fctrl)
-		if not (enums and useItem) then return nil end
-		return { util = util, enums = enums, useItem = useItem, fighter = fctrl }
-	end
-
-	-- Install once: redirect fire camera data toward silent/rage target.
-	-- CRITICAL: always forward with (self, ...) when not modifying — table.unpack
-	-- drops/corrupts args and was blocking all damage in the full place.
-	task.spawn(function()
-		if not roseFullGame then return end
-		task.wait(1)
-		local M = getFighterModules()
-		if not M or not hookfunction or not newcclosure then return end
-		local enums, remote = M.enums, M.useItem
-		if typeof(remote) ~= "Instance" or not remote:IsA("RemoteEvent") then return end
-
-		local startShootEnum
-		pcall(function()
-			if enums and enums.ToEnum then
-				startShootEnum = enums:ToEnum("StartShooting")
-			end
-		end)
-
-		local old
-		local ok = pcall(function()
-			old = hookfunction(remote.FireServer, newcclosure(function(self, obj, action, cameradata, ...)
-				-- Default: never touch the call (preserves damage)
-				local silentOn = Settings["silent.enabled"] == true
-				local rageOn = Settings["rage.enabled"] == true
-				if not silentOn and not rageOn then
-					return old(self, obj, action, cameradata, ...)
-				end
-
-				local lobbyFn = shared.RoseInLobby
-				if type(lobbyFn) == "function" and lobbyFn() then
-					return old(self, obj, action, cameradata, ...)
-				end
-
-				-- Only rewrite StartShooting packets when we have a live target
-				local isShoot = true
-				if startShootEnum ~= nil and action ~= nil then
-					isShoot = (action == startShootEnum)
-				end
-				if not isShoot then
-					return old(self, obj, action, cameradata, ...)
-				end
-
-				local Tr = shared.RoseTrack
-				local part = Tr and Tr.part
-				local mode = Tr and Tr.mode
-				local want = (rageOn and mode == "rage")
-					or (silentOn and (mode == "silent" or mode == "aim" or mode == "rage"))
-				if not want or not part or not part.Parent or typeof(cameradata) ~= "table" then
-					return old(self, obj, action, cameradata, ...)
-				end
-				local hc = Settings["silent.hitchance"]
-				if type(hc) == "number" and hc < 100 and math.random(1, 100) > hc then
-					return old(self, obj, action, cameradata, ...)
-				end
-
-				local cam = workspace.CurrentCamera
-				local origin = cam and cam.CFrame.Position
-				if not origin then
-					return old(self, obj, action, cameradata, ...)
-				end
-
-				local dest = part.Position
-				pcall(function()
-					dest = dest + part.AssemblyLinearVelocity * (Settings["aim.pred"] or 0)
-				end)
-				local dir = dest - origin
-				if dir.Magnitude < 0.05 then
-					return old(self, obj, action, cameradata, ...)
-				end
-				dir = dir.Unit
-
-				-- Clone table so we do not mutate shared refs the game reuses
-				local cd = {}
-				for k, v in pairs(cameradata) do
-					cd[k] = v
-				end
-				local cf = CFrame.lookAt(origin, origin + dir)
-				cd.CFrame = cf
-				cd.CameraCFrame = cf
-				cd.LookVector = dir
-				cd.lookVector = dir
-				if cd.Origin ~= nil then cd.Origin = origin end
-				if cd.Position ~= nil then cd.Position = origin end
-
-				return old(self, obj, action, cd, ...)
-			end))
-		end)
-		if ok and old then
-			Premium.silentHook = true
-			table.insert(cleanups, function()
-				pcall(function()
-					if old then hookfunction(remote.FireServer, old) end
-				end)
-			end)
-		else
-			warn("[Rose] fire hook not installed — shots use normal aim")
-		end
-	end)
-end
-
+-- (legacy Premium engine removed — exact combat port at end of file)
 
 -- module toasts
 do
@@ -5091,6 +4910,7 @@ end
 --------------------------------------------------------------------------
 -- go
 --------------------------------------------------------------------------
+shared.RoseSettings = Settings
 bulk = true
 for key, h in pairs(Handlers) do h(Settings[key]) end
 bulk = false
@@ -5170,7 +4990,7 @@ end
 
 print("[Rose] loaded")
 if not Settings["misc.silentload"] and Settings["misc.loadnotify"] ~= false and Settings["misc.notify"] ~= false then
-	local mode = roseFullGame and "FULL mode · silent + rage + skins" or "UNIVERSAL mode · aimbot + shared features"
+	local mode = "FULL mode · all features"
 	notify("Rose", mode .. " · " .. prettyKey(Settings["set.menukey"]) .. " toggles menu")
 end
 
@@ -9438,3 +9258,2973 @@ end)
 
 
 end -- skin changer scope
+
+--==========================================================================
+-- ROSE · exact combat port (Silent Aim + Ragebot from source client)
+-- Thin shims only — combat logic below is the original module code.
+--==========================================================================
+do
+	if getgenv().__RoseCombatPorted then
+		return
+	end
+	getgenv().__RoseCombatPorted = true
+
+	local Players = game:GetService("Players")
+	local RunService = game:GetService("RunService")
+	local UserInputService = game:GetService("UserInputService")
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local HttpService = game:GetService("HttpService")
+	local LocalPlayer = Players.LocalPlayer
+	local lplr = LocalPlayer
+	local gameCamera = workspace.CurrentCamera
+	local cloneref = cloneref or function(x) return x end
+
+	local function isLobby()
+		if type(shared.RoseInLobby) == "function" then
+			local ok, v = pcall(shared.RoseInLobby)
+			if ok then
+				return v
+			end
+		end
+		return false
+	end
+	shared._RoseCombatIsLobby = isLobby
+
+	local function isShootingRange()
+		local function matches(value)
+			if value == nil then return false end
+			local text = tostring(value):lower():gsub("[%s_%-]", "")
+			return text:find("shootingrange", 1, true) ~= nil or text:find("firingrange", 1, true) ~= nil
+		end
+		for _, object in ipairs({workspace, LocalPlayer}) do
+			for _, attribute in ipairs({"Map", "MapName", "Mode", "GameMode", "Arena", "Environment", "ShootingRange"}) do
+				local value = object:GetAttribute(attribute)
+				if (value == true and attribute == "ShootingRange") or matches(value) then
+					return true
+				end
+			end
+		end
+		return false
+	end
+
+	local entitylib = {
+		isAlive = false,
+		character = {
+			RootPart = nil,
+			Head = nil,
+			Humanoid = nil,
+			HumanoidRootPart = nil,
+		},
+		List = {},
+		Connections = {},
+		Events = {},
+	}
+	function entitylib.getEntityColor(_self, _ent)
+		return Color3.new(1, 1, 1)
+	end
+	function entitylib.getEntity(_self, _who)
+		return {
+			RootPart = nil,
+			Head = nil,
+			Humanoid = nil,
+			Player = nil,
+			Character = nil,
+			Part = nil,
+		}
+	end
+	function entitylib:GetEvent(name)
+		if not self.Events[name] then
+			self.Events[name] = {
+				Connections = {},
+				Connect = function(s, f)
+					table.insert(s.Connections, f)
+					return { Disconnect = function() end }
+				end,
+				Fire = function() end,
+			}
+		end
+		return self.Events[name]
+	end
+
+	local mainapi = {
+		Libraries = {
+			entitylib = entitylib,
+			Targetinfo = {
+				Targets = {},
+				UpdateInfo = function(_self) end,
+			},
+		},
+		Modules = {},
+		ClickGuiStatus = false,
+		MainScreenGui = nil,
+		Font = Enum.Font.Gotham,
+	}
+	function mainapi:Clean(c)
+		if typeof(c) == "RBXScriptConnection" then
+			c:Disconnect()
+		elseif type(c) == "function" then
+			pcall(c)
+		end
+	end
+	function mainapi:SafeNotify(t)
+		if type(notify) == "function" and type(t) == "table" then
+			pcall(notify, "Rose", tostring(t.Text or ""))
+		end
+	end
+	pcall(function()
+		mainapi.MainScreenGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("RoseUI")
+			or LocalPlayer.PlayerGui:FindFirstChild("RoseHUD")
+	end)
+
+	local function makeOption(kind, def)
+		def = def or {}
+		local o = {
+			Enabled = def.Default == true,
+			Value = def.Default,
+			Colors = def.Colors,
+			ColorTransparency = def.ColorTransparency,
+			List = def.List,
+			Frame = { Visible = true },
+			Darker = def.Darker,
+			Visible = def.Visible ~= false,
+		}
+		if kind == "toggle" then
+			o.Enabled = def.Default == true
+			o.Value = o.Enabled
+		elseif kind == "slider" then
+			o.Value = def.Default or def.Min or 0
+		elseif kind == "dropdown" then
+			o.Value = def.Default or (def.List and def.List[1]) or ""
+		end
+		function o:SetValue(v)
+			self.Value = v
+			if kind == "toggle" then
+				self.Enabled = v and true or false
+			end
+			if type(def.Function) == "function" then
+				pcall(def.Function, v)
+			end
+		end
+		return o
+	end
+
+	local function makeModule(name)
+		local mod = {
+			Name = name,
+			Enabled = false,
+			Expanded = false,
+			Settings = {},
+			_cleans = {},
+			Colors = nil,
+			_fn = nil,
+		}
+		function mod:Clean(c)
+			table.insert(self._cleans, c)
+		end
+		function mod:AddToggle(def)
+			local o = makeOption("toggle", def)
+			self.Settings[(def and def.Name) or "toggle"] = o
+			return o
+		end
+		function mod:AddSlider(def)
+			local o = makeOption("slider", def)
+			self.Settings[(def and def.Name) or "slider"] = o
+			return o
+		end
+		function mod:AddDropdown(def)
+			local o = makeOption("dropdown", def)
+			self.Settings[(def and def.Name) or "dropdown"] = o
+			return o
+		end
+		function mod:AddInputBox(def)
+			return makeOption("dropdown", def)
+		end
+		function mod:AddLabel(def)
+			return { Text = def and def.Text or "" }
+		end
+		function mod:Toggle(state)
+			if state == nil then
+				state = not self.Enabled
+			end
+			self.Enabled = state and true or false
+			if type(self._fn) == "function" then
+				pcall(self._fn, self.Enabled)
+			end
+		end
+		mainapi.Modules[name] = mod
+		return mod
+	end
+
+	local Combat = {}
+	function Combat:AddModule(def)
+		local mod = makeModule(def.Name or "Module")
+		mod._fn = def.Function
+		return mod
+	end
+	local Movement = Combat
+	local Other = Combat
+	local uipallet = { FinalColor = Color3.fromRGB(186, 140, 255) }
+	shared._RoseCombatOther = Other
+	shared._RoseCombatUIPallet = uipallet
+
+	local function run(fn)
+		local ok, err = pcall(fn)
+		if not ok then
+			warn("[Rose combat port]", err)
+		end
+	end
+
+	shared.RoseCombatMainapi = mainapi
+	shared.RoseCombatBridge = {
+		enableSilent = function(on)
+			local m = mainapi.Modules["Silent Aim"]
+			if m then
+				m:Toggle(on and true or false)
+			end
+		end,
+		enableRage = function(on)
+			local m = mainapi.Modules["Ragebot"]
+			if m then
+				m:Toggle(on and true or false)
+			end
+		end,
+	}
+
+	--######## BEGIN ORIGINAL SILENT AIM MODULE ########
+
+run(function()
+    local SilentAim
+    local Mode
+    local Range
+    local HitChance
+    local HeadshotChance
+    local AutoFire
+    local AutoReload
+    local Manipulation
+    local ClosestPart
+    local Visualize
+    local RageCircle
+    local Outline
+    local CircleFilled
+    local FOVColor1
+    local FOVColor2
+    local FOVColor3
+    local OutlineColor1
+    local OutlineColor2
+    local OutlineColor3
+    local FillColor1
+    local FillColor2
+    local FillColor3
+    local Lerp
+    local MovingRotation
+    local RotationValue
+    local RotationSpeed
+    local FOVPosition
+    local ShowTarget
+    local CircleObject
+    local FillCircleObject
+    local FillGradientObject
+    local FillScreenGui
+    local FillGradientLines = {}
+    local OutlineGradientLines = {}
+    local FOVVisualPosition
+    local SilentTargetPart
+    local VisibleOnly
+    local IgnoreProtected
+    local IgnoreIf
+    local DisableOnFlash
+    local LimitDistance
+    local MaxDistance
+    local ReactionTime
+    local ForgetTime
+    local TargetPart
+    local ClosestPartBlacklist
+    local LockedTarget
+    local LockedTargetPart
+    local CandidateTarget
+    local CandidateSince = 0
+    local LastTargetSeen = 0
+
+    local R15Parts = {
+        "Head", "UpperTorso", "LowerTorso", "HumanoidRootPart",
+        "LeftUpperArm", "LeftLowerArm", "LeftHand",
+        "RightUpperArm", "RightLowerArm", "RightHand",
+        "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+        "RightUpperLeg", "RightLowerLeg", "RightFoot",
+    }
+    local R15LimbParts = {
+        LeftUpperArm = true, LeftLowerArm = true, LeftHand = true,
+        RightUpperArm = true, RightLowerArm = true, RightHand = true,
+        LeftUpperLeg = true, LeftLowerLeg = true, LeftFoot = true,
+        RightUpperLeg = true, RightLowerLeg = true, RightFoot = true,
+    }
+    
+    local rs = cloneref(game:GetService("ReplicatedStorage"))
+    local ps = cloneref(game:GetService("Players"))
+    local workspace = cloneref(game:GetService("Workspace"))
+    local RunService = cloneref(game:GetService("RunService"))
+    local UserInputService = cloneref(game:GetService("UserInputService"))
+    
+    local cam = workspace.CurrentCamera
+    local util = require(rs.Modules.Utility)
+    local enums = require(rs.Modules.EnumLibrary)
+    local lplr = ps.LocalPlayer
+    
+    local oldFireServer
+    local silentHookInstalled = false
+    local rand = Random.new()
+
+    local function removeCircle()
+        if CircleObject then
+            pcall(function()
+                CircleObject.Visible = false
+                CircleObject:Remove()
+            end)
+            CircleObject = nil
+        end
+        if FillCircleObject then
+            pcall(function()
+                FillCircleObject.Visible = false
+                FillCircleObject:Destroy()
+            end)
+            FillCircleObject = nil
+            FillGradientObject = nil
+        end
+        if FillScreenGui then
+            pcall(function()
+                FillScreenGui:Destroy()
+            end)
+            FillScreenGui = nil
+        end
+        for _, line in FillGradientLines do
+            line.Visible = false
+            line:Remove()
+        end
+        table.clear(FillGradientLines)
+        for _, line in OutlineGradientLines do
+            line.Visible = false
+            line:Remove()
+        end
+        table.clear(OutlineGradientLines)
+    end
+
+    local function ensureCircle()
+        if not FillCircleObject then
+            FillScreenGui = Instance.new("ScreenGui")
+            FillScreenGui.Name = "__LionSilentFOVFill"
+            FillScreenGui.IgnoreGuiInset = true
+            FillScreenGui.ResetOnSpawn = false
+            FillScreenGui.DisplayOrder = 1000000
+            FillScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+            FillScreenGui.Parent = lplr:WaitForChild("PlayerGui")
+
+            FillCircleObject = Instance.new("Frame")
+            FillCircleObject.AnchorPoint = Vector2.new(0.5, 0.5)
+            FillCircleObject.BackgroundColor3 = Color3.new(1, 1, 1)
+            FillCircleObject.BorderSizePixel = 0
+            FillCircleObject.Visible = false
+            FillCircleObject.ZIndex = 1
+            FillCircleObject.Parent = FillScreenGui
+
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(1, 0)
+            corner.Parent = FillCircleObject
+
+            FillGradientObject = Instance.new("UIGradient")
+            FillGradientObject.Rotation = 0
+            FillGradientObject.Parent = FillCircleObject
+        end
+
+        if not CircleObject and Drawing then
+            CircleObject = Drawing.new("Circle")
+            CircleObject.Filled = false
+            CircleObject.Color = (RageCircle and RageCircle.Value) or Color3.fromRGB(255, 255, 255)
+            CircleObject.Radius = Range and Range.Value or 100
+            CircleObject.Transparency = 1
+            CircleObject.Thickness = 2
+            CircleObject.Visible = false
+        end
+
+    end
+
+    local function getThreeColors(option)
+        if option and option.Colors then
+            return option.Colors[1] or Color3.new(), option.Colors[2] or Color3.new(), option.Colors[3] or Color3.new()
+        end
+        return Color3.new(), Color3.new(), Color3.new()
+    end
+
+    local function getThreeTransparency(option)
+        if option and option.ColorTransparency then
+            return option.ColorTransparency[1] or 0, option.ColorTransparency[2] or 0, option.ColorTransparency[3] or 0
+        end
+        return 0, 0, 0
+    end
+
+    local function updateGradientGui(center, radius, option, visible)
+        if not FillCircleObject or not FillGradientObject then return end
+        FillCircleObject.Visible = visible
+        if not visible then return end
+        local a, b, c = getThreeColors(option)
+        local ta, tb, tc = getThreeTransparency(option)
+        local opacity = 0.46
+        FillCircleObject.Position = UDim2.fromOffset(center.X, center.Y)
+        FillCircleObject.Size = UDim2.fromOffset(radius * 2, radius * 2)
+        FillGradientObject.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, a),
+            ColorSequenceKeypoint.new(0.5, b),
+            ColorSequenceKeypoint.new(1, c),
+        })
+        FillGradientObject.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1 - (opacity * (1 - ta))),
+            NumberSequenceKeypoint.new(0.5, 1 - (opacity * (1 - tb))),
+            NumberSequenceKeypoint.new(1, 1 - (opacity * (1 - tc))),
+        })
+        local rotation = RotationValue and RotationValue.Value or 0
+        if MovingRotation and MovingRotation.Enabled then
+            rotation += os.clock() * 360 * (RotationSpeed and RotationSpeed.Value or 1)
+        end
+        FillGradientObject.Rotation = rotation % 360
+    end
+
+    local function tweenFOVPosition(target, dt)
+        if not FOVVisualPosition then
+            FOVVisualPosition = target
+            return target
+        end
+        local progress = math.clamp((dt or 0) / 0.18, 0, 1)
+        local alpha = TweenService:GetValue(progress, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        FOVVisualPosition = FOVVisualPosition:Lerp(target, alpha)
+        if (FOVVisualPosition - target).Magnitude < 0.1 then FOVVisualPosition = target end
+        return FOVVisualPosition
+    end
+
+    local function gradientColor(a, b, c)
+        if a and a.Colors then
+            a, b, c = a.Colors[1], a.Colors[2], a.Colors[3]
+        end
+        local function asColor(value, fallback)
+            if typeof(value) == "Color3" then
+                return value
+            end
+            if type(value) == "table" and typeof(value.Value) == "Color3" then
+                return value.Value
+            end
+            return fallback or Color3.fromRGB(255, 255, 255)
+        end
+        a = asColor(a)
+        b = asColor(b, a)
+        c = asColor(c, b)
+        local t = (tick() * 0.25) % 1
+        if t < 0.5 then
+            return a:Lerp(b, t * 2)
+        end
+        return b:Lerp(c, (t - 0.5) * 2)
+    end
+
+    local function gradientColorAt(option, alpha)
+        local a, b, c = getThreeColors(option)
+        alpha = math.clamp(alpha or 0, 0, 1)
+        if alpha < 0.5 then
+            return a:Lerp(b, alpha * 2)
+        end
+        return b:Lerp(c, (alpha - 0.5) * 2)
+    end
+
+    local function hideDrawingLines(lines, startIndex)
+        for i = startIndex or 1, #lines do
+            if lines[i] then
+                lines[i].Visible = false
+            end
+        end
+    end
+
+    local function getDrawingLine(lines, index)
+        local line = lines[index]
+        if not line and Drawing then
+            line = Drawing.new("Line")
+            line.Visible = false
+            lines[index] = line
+        end
+        return line
+    end
+
+    local function updateGradientFill(lines, center, radius, option, visible, transparency)
+        local count = math.clamp(math.floor(radius * 3), 240, 520)
+        if not visible then
+            hideDrawingLines(lines)
+            return
+        end
+        local drawRadius = math.max(radius - 1.25, 1)
+        local step = (drawRadius * 2) / count
+        for i = 1, count do
+            local alpha = (i - 1) / math.max(count - 1, 1)
+            local x = -drawRadius + (step * (i - 0.5))
+            local h = math.sqrt(math.max((drawRadius * drawRadius) - (x * x), 0)) * 2
+            local line = getDrawingLine(lines, i)
+            if line then
+                line.From = Vector2.new(center.X + x, center.Y - (h / 2))
+                line.To = Vector2.new(center.X + x, center.Y + (h / 2))
+                line.Color = gradientColorAt(option, alpha)
+                line.Transparency = transparency
+                line.Thickness = math.max(1, step + 0.15)
+                line.Visible = true
+            end
+        end
+        hideDrawingLines(lines, count + 1)
+    end
+
+    local function updateGradientOutline(lines, center, radius, option, visible, thickness, transparency)
+        local count = math.clamp(math.floor(radius * 2), 160, 320)
+        if not visible then
+            hideDrawingLines(lines)
+            return
+        end
+        for i = 1, count do
+            local a1 = ((i - 1) / count) * math.pi * 2
+            local a2 = (i / count) * math.pi * 2
+            local drawRadius = radius
+            local x1, y1 = math.cos(a1) * drawRadius, math.sin(a1) * drawRadius
+            local x2, y2 = math.cos(a2) * drawRadius, math.sin(a2) * drawRadius
+            local alpha = ((x1 / drawRadius) + 1) * 0.5
+            local line = getDrawingLine(lines, i)
+            if line then
+                line.From = Vector2.new(center.X + x1, center.Y + y1)
+                line.To = Vector2.new(center.X + x2, center.Y + y2)
+                line.Color = gradientColorAt(option, alpha)
+                line.Transparency = transparency
+                line.Thickness = thickness
+                line.Visible = true
+            end
+        end
+        hideDrawingLines(lines, count + 1)
+    end
+
+    mainapi:Clean(removeCircle)
+    mainapi:Clean(lplr.OnTeleport:Connect(removeCircle))
+
+    _G.LionSilentDeflecting = _G.LionSilentDeflecting or {}
+
+    local function installSilentKatanaTracker()
+        local items = lplr:FindFirstChild("PlayerScripts")
+        items = items and items:FindFirstChild("Modules")
+        items = items and items:FindFirstChild("Items")
+        local katanaScript = items and items:FindFirstChild("Katana")
+        if not katanaScript then return false end
+
+        local ok, katana = pcall(require, katanaScript)
+        if not ok or type(katana) ~= "table" then return false end
+        local class = type(rawget(katana, "ReplicateFromServer")) == "function" and katana or getmetatable(katana)
+        if type(class) ~= "table" or type(rawget(class, "ReplicateFromServer")) ~= "function" then return false end
+        if rawget(class, "__LionSilentKatanaHook") then return true end
+
+        class.__LionSilentKatanaHook = true
+        local oldReplicate = class.ReplicateFromServer
+        class.ReplicateFromServer = function(self, action, ...)
+            local actionName = tostring(action):lower()
+            if actionName:find("deflect", 1, true)
+                or actionName == "startaiming"
+                or actionName == "startblocking" then
+                local fighter = self and (rawget(self, "ClientFighter") or self.ClientFighter)
+                local player = fighter and fighter.Player
+                if player and player ~= lplr then
+                    local duration = 1
+                    pcall(function()
+                        duration = self.Info and self.Info.DeflectDuration or duration
+                    end)
+                    _G.LionSilentDeflecting[player.UserId] = tick() + duration + 0.12
+                end
+            end
+            return oldReplicate(self, action, ...)
+        end
+        return true
+    end
+
+    local function shouldBlockShotForKatana(target)
+        local blocker = rawget(_G, "ShouldBlockShotForKatana")
+        if type(blocker) == "function" then
+            local ok, blocked = pcall(blocker, target)
+            if ok and blocked == true then return true end
+        end
+        local player = typeof(target) == "Instance" and ps:GetPlayerFromCharacter(target)
+        local expires = player and _G.LionSilentDeflecting[player.UserId]
+        if expires and expires > tick() then return true end
+        if player and expires then _G.LionSilentDeflecting[player.UserId] = nil end
+        return false
+    end
+
+    task.defer(installSilentKatanaTracker)
+
+    local function getFighter()
+        local ok, fighter = pcall(function()
+            return require(lplr.PlayerScripts.Controllers.FighterController)
+        end)
+        if not ok or not fighter then return nil end
+        return fighter.LocalFighter
+    end
+
+    local function getMuzzleScreenPosition(camera)
+        local muzzle
+        local fighter = getFighter()
+        local item = fighter and fighter.EquippedItem
+        pcall(function()
+            if item and item.ViewModel and item.ViewModel.GetMuzzlePosition then
+                muzzle = item.ViewModel:GetMuzzlePosition()
+            end
+        end)
+        if not muzzle then
+            pcall(function()
+                local viewModels = workspace:FindFirstChild("ViewModels")
+                if viewModels then
+                    for _, model in viewModels:GetChildren() do
+                        if model:IsA("Model") and model.Name:find(lplr.Name, 1, true) then
+                            local part = model:FindFirstChild("Muzzle", true)
+                                or model:FindFirstChild("Barrel", true)
+                                or model:FindFirstChild("Handle", true)
+                            if part and part:IsA("BasePart") then
+                                muzzle = part.Position
+                                break
+                            elseif part and part:IsA("Attachment") then
+                                muzzle = part.WorldPosition
+                                break
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        if muzzle and camera then
+            local pos, visible = camera:WorldToViewportPoint(muzzle)
+            if visible then
+                return Vector2.new(pos.X, pos.Y)
+            end
+        end
+    end
+
+    local function tryAutoReload(item, fighter)
+        if not AutoReload or not AutoReload.Enabled then return false end
+        if not item then return false end
+        if fighter and fighter.Get and fighter:Get("Reloading") then return true end
+
+        local ammo = item.Get and item:Get("Ammo")
+        if type(ammo) ~= "number" or ammo > 0 then return false end
+
+        local reserve = item.Get and item:Get("AmmoReserve")
+        if reserve ~= nil and reserve <= 0 and not (fighter and fighter.Get and fighter:Get("InfiniteAmmoReserve")) then
+            return false
+        end
+
+        local reloaded = false
+        if type(item.SimulateInputFromGameplayMechanic) == "function" then
+            local ok, started = pcall(item.SimulateInputFromGameplayMechanic, item, "StartReloading")
+            reloaded = ok and started ~= false
+        end
+        if not reloaded and fighter and type(fighter.Input) == "function" then
+            local ok, started = pcall(fighter.Input, fighter, "StartReloading")
+            reloaded = ok and started ~= false
+        end
+        if not reloaded and type(item.StartReloading) == "function" then
+            local ok, started = pcall(item.StartReloading, item)
+            reloaded = ok and started == true
+        end
+        return reloaded
+    end
+
+    local function getUseItemRemote()
+    local remotes = rs:FindFirstChild("Remotes")
+    if not remotes then return nil end
+
+    local replication = remotes:FindFirstChild("Replication")
+    if not replication then return nil end
+
+    local fighter = replication:FindFirstChild("Fighter")
+    if not fighter then return nil end
+
+    local useItem = fighter:FindFirstChild("UseItem")
+    if not useItem or not useItem:IsA("RemoteEvent") then
+        return nil
+    end
+
+    return useItem
+end
+    -- Raycast Parameters
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.IgnoreWater = true
+    
+    -- AutoFire??raycast params
+    local ray_params = RaycastParams.new()
+    
+    -- AutoFire??offset ?袁⑸ ?節? 덩?
+    local vec = Vector3.new
+    local offsets = {
+        vec(0, 12, 0), vec(0, 16, 0), vec(0, 20, 0), vec(0, 24, 0),
+        vec(0, 28, 0), vec(0, 32, 0), vec(0, 36, 0), vec(0, 40, 0)
+    }
+    
+    -------------------------------------------------
+    -- MANIPULATION (AutoFire??
+    -------------------------------------------------
+    
+    local manipulation = {}
+    
+    manipulation.get_closest = function()
+        if not lplr.Character or not lplr.Character:FindFirstChild("HumanoidRootPart") then
+            return nil, nil
+        end
+        
+        local target, char, dist = nil, nil, math.huge
+        
+        for i, v in next, ps:GetPlayers() do
+            if v ~= lplr and v.Character and v.Character:FindFirstChild("Head") then
+                local mag = (lplr.Character.HumanoidRootPart.Position - v.Character.Head.Position).Magnitude
+                if mag < dist then
+                    dist = mag
+                    target = v.Character.Head
+                    char = v.Character
+                end
+            end
+        end
+        
+        return target, char
+    end
+    
+    manipulation.calculate_point = function(origin, target_pos, target_char)
+        ray_params.FilterDescendantsInstances = {lplr.Character, target_char}
+        ray_params.FilterType = Enum.RaycastFilterType.Exclude
+        
+        if not workspace:Raycast(origin, target_pos - origin, ray_params) then
+            return origin, nil
+        end
+        
+        for i, offset in next, offsets do
+            local scan_pos = origin + offset
+            if not workspace:Raycast(scan_pos, target_pos - scan_pos, ray_params) then
+                return scan_pos, offset.Y
+            end
+        end
+        
+        return nil, nil
+    end
+
+    local getPredictedPosition
+
+    local function buildManipulationCameraData(fromPos, part)
+        if not util or not part then return nil end
+        local aimPosition = (getPredictedPosition and getPredictedPosition(part)) or part.Position
+        local look = CFrame.new(fromPos, aimPosition)
+        local data = {}
+        data[utf8.char(1)] = {
+            [utf8.char(0)] = util:EncodeCFrame(look),
+            [utf8.char(1)] = util:EncodeCFrame(look),
+            [utf8.char(2)] = part,
+            [utf8.char(3)] = util:EncodeCFrame(part.CFrame:ToObjectSpace(CFrame.new(aimPosition)))
+        }
+        return data
+    end
+
+    local function getManipulationShootPosition(targetPart, targetChar)
+        local camera = workspace.CurrentCamera or cam
+        local fromPos = camera and camera.CFrame.Position or targetPart.Position
+
+        if not Manipulation or not Manipulation.Enabled then
+            return fromPos
+        end
+
+        local manip = manipulation.calculate_point(fromPos, targetPart.Position, targetChar)
+        return manip or fromPos
+    end
+    
+    -------------------------------------------------
+    -- PREDICTION
+    -------------------------------------------------
+    
+    getPredictedPosition = function(targetPart)
+        local velocity = targetPart.AssemblyLinearVelocity or targetPart.Velocity or Vector3.zero
+        local lead = math.clamp(velocity.Magnitude / 350, 0, 0.12)
+        local pred = targetPart.Position + velocity * lead
+
+        if math.abs(velocity.Y) > 2 then
+            pred = pred + Vector3.new(0, velocity.Y * math.min(lead, 0.05), 0)
+        end
+        
+        return pred
+    end
+
+    local function canSeeTarget(target)
+        if not entitylib.isAlive then return false end
+        if not target or not target:FindFirstChild("Head") then return false end
+        
+        local myPos = cam.CFrame.Position
+        local targetPos = target.Head.Position
+        
+        rayParams.FilterDescendantsInstances = {
+            lplr.Character,
+            target,
+            cam
+        }
+        
+        local ray = workspace:Raycast(myPos, targetPos - myPos, rayParams)
+        
+        return not ray or ray.Instance:IsDescendantOf(target)
+    end
+
+    local function isProtectedTarget(target)
+        if not target then return true end
+        if target:FindFirstChild("InvincibilityParticles", true) then return true end
+        local root = target:FindFirstChild("HumanoidRootPart")
+        if not root then return true end
+        for _, obj in root:GetChildren() do
+            if obj:IsA("Attachment") and obj.Name == "Attachment" then
+                return true
+            end
+        end
+        return false
+    end
+
+    local function getTargetWeapon(target)
+        local player = ps:GetPlayerFromCharacter(target)
+        if not player then return "" end
+        for _, object in target:GetDescendants() do
+            local lower = object.Name:lower()
+            if lower:find("riot", 1, true) or lower:find("shield", 1, true) then
+                return "riot shield"
+            elseif lower:find("katana", 1, true) then
+                return "katana"
+            end
+        end
+        local viewModels = workspace:FindFirstChild("ViewModels")
+        if not viewModels then return "" end
+        for _, model in viewModels:GetDescendants() do
+            if model:IsA("Model") then
+                local name = model.Name
+                local lower = name:lower()
+                if lower:find(player.Name:lower(), 1, true) then
+                    if lower:find("riot", 1, true) or lower:find("shield", 1, true) then
+                        return "riot shield"
+                    elseif lower:find("katana", 1, true) then
+                        return "katana"
+                    end
+                end
+            end
+        end
+        return ""
+    end
+
+    local function isBlockedByRiotShield(target)
+        if getTargetWeapon(target) ~= "riot shield" then return false end
+        local targetRoot = target and target:FindFirstChild("HumanoidRootPart")
+        local localRoot = lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot or not localRoot then return false end
+        local offset = localRoot.Position - targetRoot.Position
+        return offset.Magnitude > 0 and targetRoot.CFrame.LookVector:Dot(offset.Unit) > 0
+    end
+
+    local function isFlashed()
+        if game:GetService("Lighting"):FindFirstChild("Flashbang") then return true end
+        local playerGui = lplr:FindFirstChild("PlayerGui")
+        return playerGui and playerGui:FindFirstChild("FlashbangGui") ~= nil or false
+    end
+
+    local function shouldIgnoreTarget(target)
+        local root = target and target:FindFirstChild("HumanoidRootPart")
+        local hum = target and target:FindFirstChildOfClass("Humanoid")
+        if not root or not hum or hum.Health <= 0 then return true end
+        if VisibleOnly and VisibleOnly.Enabled and not canSeeTarget(target) then return true end
+        if IgnoreProtected and IgnoreProtected.Enabled and isProtectedTarget(target) then return true end
+        if LimitDistance and LimitDistance.Enabled then
+            local myRoot = lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
+            if not myRoot or (root.Position - myRoot.Position).Magnitude > MaxDistance.Value then return true end
+        end
+        local ignored = IgnoreIf and IgnoreIf.Value or {}
+        if ignored["katana deflecting"] and shouldBlockShotForKatana(target) then return true end
+        if ignored["blocked by riot shield"] and isBlockedByRiotShield(target) then return true end
+        return false
+    end
+    
+    -------------------------------------------------
+    -- TARGET FUNCTIONS
+    -------------------------------------------------
+    
+    local function getTargetPosition()
+        local root = entitylib.isAlive and entitylib.character and entitylib.character.RootPart
+        return root and root.Position or nil
+    end
+
+    local function getAimParts(char)
+        local parts = {}
+        if not char then return parts end
+        local blacklist = ClosestPartBlacklist and ClosestPartBlacklist.Value or {}
+        for _, name in ipairs(R15Parts) do
+            if blacklist[name] then continue end
+            local part = char:FindFirstChild(name)
+            if part and part:IsA("BasePart") then
+                table.insert(parts, part)
+            end
+        end
+        return parts
+    end
+
+    local function getFOVOrigin(targetPart)
+        local camera = workspace.CurrentCamera or cam
+        local mode = FOVPosition and FOVPosition.Value or ""
+        local origin
+        if mode == "position on target" and targetPart then
+            local pos, visible = camera:WorldToViewportPoint(targetPart.Position)
+            if visible then
+                origin = Vector2.new(pos.X, pos.Y)
+            end
+        end
+
+        if not origin and mode == "position on barrel" and camera then
+            origin = getMuzzleScreenPosition(camera)
+        end
+
+        if not origin and camera then
+            local viewport = camera.ViewportSize
+            origin = Vector2.new(viewport.X / 2, viewport.Y / 2)
+        end
+        origin = origin or UserInputService:GetMouseLocation()
+        return origin
+    end
+
+    local function getClosestPart(char, origin)
+        local best, dist = nil, math.huge
+        for _, part in ipairs(getAimParts(char)) do
+            local pos, visible = cam:WorldToViewportPoint(part.Position)
+            if visible then
+                local d = (Vector2.new(pos.X, pos.Y) - origin).Magnitude
+                if d < dist then
+                    best, dist = part, d
+                end
+            end
+        end
+        return best, dist
+    end
+    
+    -- Position ? ル??꾤땟??? 360?????? 維????????좊읈?????좊읈?? 싲 ?  ???????
+    local function getTargetByPosition()
+        local myPos = getTargetPosition()
+        if not myPos then return nil end
+        
+        local maxRange = RageCircle.Enabled and Range.Value or math.huge
+        local best, dist = nil, maxRange
+        
+        for _, v in pairs(ps:GetPlayers()) do
+            if v ~= lplr and v.Character then
+                local hrp = v.Character:FindFirstChild("HumanoidRootPart")
+                local hum = v.Character:FindFirstChildOfClass("Humanoid")
+                
+                if hrp and hum and hum.Health > 0 and not shouldIgnoreTarget(v.Character) then
+                    local origin = getFOVOrigin()
+                    local fixedPart = v.Character:FindFirstChild(TargetPart and TargetPart.Value or "Head")
+                    local targetPart, screenDist = fixedPart, 0
+                    if ClosestPart and ClosestPart.Enabled then
+                        targetPart, screenDist = getClosestPart(v.Character, origin)
+                    end
+                    local d = targetPart and (RageCircle.Enabled and screenDist or (hrp.Position - myPos).Magnitude) or math.huge
+                    if d < dist then
+                        best = v.Character
+                        SilentTargetPart = targetPart
+                        dist = d
+                    end
+                end
+            end
+        end
+        
+        return best, SilentTargetPart
+    end
+    
+    -- Mouse ? ル??꾤땟??? ? ル?????????  ??? (Circle ??? ? 땾????源끹걬癲?? 꾧???????????   ???? 챶??
+    local function getTargetByMouse()
+        local mouse = getFOVOrigin()
+        local maxRange = RageCircle.Enabled and Range.Value or math.huge
+        local best, dist = nil, maxRange
+        
+        for _, v in pairs(ps:GetPlayers()) do
+            if v ~= lplr and v.Character then
+                local hrp = v.Character:FindFirstChild("HumanoidRootPart")
+                local hum = v.Character:FindFirstChildOfClass("Humanoid")
+                
+                if hrp and hum and hum.Health > 0 and not shouldIgnoreTarget(v.Character) then
+                    local fixedPart = v.Character:FindFirstChild(TargetPart and TargetPart.Value or "Head")
+                    local part = (ClosestPart and ClosestPart.Enabled) and getClosestPart(v.Character, mouse) or fixedPart
+                    local pos, vis
+                    if part then
+                        pos, vis = cam:WorldToViewportPoint(part.Position)
+                    end
+                    if part and vis then
+                        local d = (Vector2.new(pos.X, pos.Y) - mouse).Magnitude
+                        if d < dist then
+                            best = v.Character
+                            SilentTargetPart = part
+                            dist = d
+                        end
+                    end
+                end
+            end
+        end
+        
+        return best, SilentTargetPart
+    end
+    
+    -- Rage ? ル??꾤땟??? ???뺤깓?? ?????좊읈?????좊읈?? 싲 ?  ???????
+    local function getTargetRage()
+        local myPos = getTargetPosition()
+        if not myPos then return nil end
+        
+        local best, dist = nil, 1000
+        
+        for _, v in pairs(ps:GetPlayers()) do
+            if v ~= lplr and v.Character then
+                local head = v.Character:FindFirstChild("Head")
+                local hrp = v.Character:FindFirstChild("HumanoidRootPart")
+                local hum = v.Character:FindFirstChildOfClass("Humanoid")
+                
+                if head and hrp and hum and hum.Health > 0 then
+                    local d = (hrp.Position - myPos).Magnitude
+                    if d < dist then
+                        best = v.Character
+                        dist = d
+                    end
+                end
+            end
+        end
+        
+        return best
+    end
+
+    local function isLobby()
+        local pg = lplr:FindFirstChild("PlayerGui")
+        if not pg then return false end
+        
+        local main = pg:FindFirstChild("MainGui")
+        if not main then return false end
+        
+        local frame = main:FindFirstChild("MainFrame")
+        if not frame then return false end
+        
+        local lobby = frame:FindFirstChild("Lobby")
+        if not lobby then return false end
+        
+        local currency = lobby:FindFirstChild("Currency")
+        if not currency then return false end
+        
+        return currency.Visible == true
+    end
+    
+    local function getTarget()
+        SilentTargetPart = nil
+        if isShootingRange() then
+            LockedTarget = nil
+            LockedTargetPart = nil
+            CandidateTarget = nil
+            return nil
+        end
+        if DisableOnFlash and DisableOnFlash.Enabled and isFlashed() then
+            LockedTarget = nil
+            LockedTargetPart = nil
+            CandidateTarget = nil
+            return nil
+        end
+
+        local target, part
+        if FOVPosition and FOVPosition.Value == "position on target" then
+            target, part = getTargetByPosition()
+        else
+            target, part = getTargetByMouse()
+        end
+
+        local now = tick()
+        if target then
+            if target ~= CandidateTarget then
+                CandidateTarget = target
+                CandidateSince = now
+            end
+
+            local reaction = (ReactionTime and ReactionTime.Value or 0) / 1000
+            if target == LockedTarget or now - CandidateSince >= reaction then
+                LockedTarget = target
+                LockedTargetPart = part
+                LastTargetSeen = now
+            end
+        else
+            CandidateTarget = nil
+        end
+
+        local forget = ForgetTime and ForgetTime.Value or 0
+        if LockedTarget and now - LastTargetSeen <= forget then
+            local hum = LockedTarget:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 and LockedTargetPart and LockedTargetPart.Parent == LockedTarget then
+                SilentTargetPart = LockedTargetPart
+                return LockedTarget
+            end
+        end
+
+        if not target or target ~= LockedTarget then
+            SilentTargetPart = nil
+            return nil
+        end
+        SilentTargetPart = LockedTargetPart or part
+        return LockedTarget
+    end
+    
+    -------------------------------------------------
+    -- RANGE CIRCLE CHECK
+    -------------------------------------------------
+    
+    local function isInCircleRange(target)
+        -- Circle????? ? 땾????源끹걬癲?????true (? 꾧???????????   ???? 챶??
+        if not RageCircle.Enabled then return true end
+        if not target or not target:FindFirstChild("Head") then return false end
+
+        local part = SilentTargetPart or target:FindFirstChild("Head")
+        local pos, vis = cam:WorldToViewportPoint(part.Position)
+        if not vis then return false end
+
+        local mouse = getFOVOrigin()
+        return (Vector2.new(pos.X, pos.Y) - mouse).Magnitude <= Range.Value
+    end
+    
+    -------------------------------------------------
+    -- SILENT AIM
+    -------------------------------------------------
+    
+    SilentAim = Combat:AddModule({
+        Name = 'Silent Aim',
+        Function = function(callback)
+            if callback then
+                if RageCircle and RageCircle.Enabled then
+                    ensureCircle()
+                end
+
+                if CircleObject then
+                    CircleObject.Visible = RageCircle and RageCircle.Enabled or false
+                end
+                
+                if not silentHookInstalled then
+                    local useItemRemote = getUseItemRemote()
+                    if not useItemRemote then
+                        return
+                    end
+
+                    local hookOk, hookErr = pcall(function()
+                        oldFireServer = hookfunction(
+                            useItemRemote.FireServer,
+                            newcclosure(function(self, obj, action, cameradata, ...)
+                        
+                        if SilentAim.Enabled and action == enums:ToEnum("StartShooting") then
+                    
+                            if isLobby() then
+                                return oldFireServer(self, obj, action, cameradata, ...)
+                            end
+
+                            local fighter = getFighter()
+                            local item = fighter and fighter.EquippedItem
+                            if tryAutoReload(item, fighter) then
+                                return nil
+                            end
+                            
+                            -- HitChance ? ル????? 물?
+                            if rand:NextNumber(0, 100) > HitChance.Value then
+                                return oldFireServer(self, obj, action, cameradata, ...)
+                            end
+                            
+                            local target = getTarget()
+                            
+                            if target and isInCircleRange(target) and target:FindFirstChild("Head") and target:FindFirstChild("HumanoidRootPart") then
+                                
+                                -- HeadshotChance ? ル????? 물?
+                                local targetPart = SilentTargetPart
+                                if not targetPart and ClosestPart and ClosestPart.Enabled then
+                                    targetPart = select(1, getClosestPart(target, getFOVOrigin()))
+                                end
+                                if not targetPart then
+                                    targetPart = (HeadshotChance and rand:NextNumber(0, 100) <= HeadshotChance.Value)
+                                        and target.Head
+                                        or target.HumanoidRootPart
+                                end
+                                targetPart = targetPart or target.Head or target.HumanoidRootPart
+                                
+                                -- Prediction ???? 굣??
+                                local fromPos = getManipulationShootPosition(targetPart, target)
+                                cameradata = buildManipulationCameraData(fromPos, targetPart) or cameradata
+                                
+                                -- Target HUD
+                                if ShowTarget.Enabled and mainapi.Libraries.Targetinfo then
+                                    local ent = select(1, entitylib.getEntity(target))
+                                    if ent then
+                                        mainapi.Libraries.Targetinfo.Targets[ent] = tick() + 2
+                                    end
+                                end
+                                
+                                return oldFireServer(self, obj, action, cameradata, ...)
+                            end
+                        end
+                        
+                        return oldFireServer(self, obj, action, cameradata, ...)
+                            end)
+                        )
+                    end)
+                    if not hookOk then
+                        warn("[Silent Aim] hook failed:", hookErr)
+                        return
+                    end
+                    silentHookInstalled = true
+                end
+                
+                -- AutoFire Loop (???? ??manipulation ? ?? ?먰맪?
+                if AutoFire and AutoFire.Enabled then
+                    local fighter = require(lplr.PlayerScripts.Controllers.FighterController)
+                    
+                    SilentAim:Clean(RunService.Heartbeat:Connect(function()
+                        if not lplr.Character then return end
+                        if mainapi.ClickGuiStatus then return end
+                        if isLobby() then return end
+                        
+                        local root = lplr.Character:FindFirstChild("HumanoidRootPart")
+                        if not root then return end
+                        
+                        if not fighter or not fighter.LocalFighter then return end
+
+                        local localFighter = fighter.LocalFighter
+                        local item = localFighter.EquippedItem
+                        if not item then return end
+                        if tryAutoReload(item, localFighter) then return end
+
+                        local target_char = getTarget()
+                        local target_part = SilentTargetPart
+                        if not target_part or not target_char then return end
+                        
+                        -- Range Circle ? ル????? 물?(Circle????諛몄?????源낃???????
+                        if RageCircle.Enabled and not isInCircleRange(target_char) then
+                            return
+                        end
+                        
+                        local shoot_pos = getManipulationShootPosition(target_part, target_char)
+                        local cameradata = buildManipulationCameraData(shoot_pos, target_part)
+                        if not cameradata then return end
+                        
+                        local useItemRemote = getUseItemRemote()
+if not useItemRemote then
+    return
+end
+
+useItemRemote:FireServer(item:Get("ObjectID"), enums:ToEnum("StartShooting"), cameradata, nil)
+                    end))
+                end
+                
+                -- TargetHud Update Loop
+                local nextTargetHudUpdate = 0
+                SilentAim:Clean(RunService.Heartbeat:Connect(function()
+                    local now = os.clock()
+                    if now < nextTargetHudUpdate then return end
+                    nextTargetHudUpdate = now + 0.1
+                    if mainapi.Libraries.Targetinfo then
+                        mainapi.Libraries.Targetinfo:UpdateInfo()
+                    end
+                end))
+
+                -- Circle Update Loop
+                SilentAim:Clean(RunService.RenderStepped:Connect(function(dt)
+                    local fovPos = tweenFOVPosition(getFOVOrigin(SilentTargetPart), dt)
+                    local radius = Range.Value
+                    local visible = SilentAim.Enabled and RageCircle.Enabled
+                    updateGradientGui(fovPos, radius, CircleFilled, visible and CircleFilled and CircleFilled.Enabled)
+                    if CircleObject then
+                        CircleObject.Position = fovPos
+                        CircleObject.Visible = visible
+                        CircleObject.Radius = radius
+                        CircleObject.Color = select(2, getThreeColors(Outline and Outline.Enabled and Outline or RageCircle))
+                        CircleObject.Transparency = 1
+                        CircleObject.Filled = false
+                        CircleObject.Thickness = Outline and Outline.Enabled and 2 or 1
+                    end
+                    hideDrawingLines(OutlineGradientLines)
+                end))
+                
+                -- ???????? 밸Ŧ? 얕 ????hook ?????
+                SilentAim:Clean(lplr.CharacterAdded:Connect(function()
+                    task.wait(1)
+                    if SilentAim.Enabled then
+                        SilentAim:Toggle()
+                        task.wait()
+                        SilentAim:Toggle()
+                    end
+                end))
+
+                SilentAim:Clean(lplr.OnTeleport:Connect(removeCircle))
+                
+            else
+                removeCircle()
+            end
+        end,
+        ExtraText = function()
+            return FOVPosition and FOVPosition.Value or ""
+        end
+    })
+    
+    -------------------------------------------------
+    -- SETTINGS
+    -------------------------------------------------
+
+    VisibleOnly = SilentAim:AddToggle({
+        Name = 'visible only',
+        Tab = 'targeting',
+        SeparateGroup = true
+    })
+
+    IgnoreProtected = SilentAim:AddToggle({
+        Name = 'ignore protected',
+        Tab = 'targeting',
+        SeparateGroup = true
+    })
+
+    IgnoreIf = SilentAim:AddDropdown({
+        Name = 'ignore if',
+        Tab = 'targeting',
+        SeparateGroup = true,
+        List = {'katana deflecting', 'blocked by riot shield'},
+        Default = {['katana deflecting'] = true, ['blocked by riot shield'] = true},
+        Multi = true
+    })
+
+    DisableOnFlash = SilentAim:AddToggle({
+        Name = 'disable on flash',
+        Tab = 'targeting',
+        SeparateGroup = true
+    })
+
+    LimitDistance = SilentAim:AddToggle({
+        Name = 'limit distance',
+        Tab = 'targeting',
+        SeparateGroup = true
+    })
+
+    MaxDistance = SilentAim:AddSlider({
+        Name = 'max distance',
+        Tab = 'targeting',
+        SeparateGroup = true,
+        Min = 10,
+        Max = 1000,
+        Default = 250,
+        Suffix = 's'
+    })
+
+    ReactionTime = SilentAim:AddSlider({
+        Name = 'reaction time',
+        Tab = 'targeting',
+        SeparateGroup = true,
+        Min = 0,
+        Max = 1000,
+        Default = 0,
+        Suffix = 'ms'
+    })
+
+    ForgetTime = SilentAim:AddSlider({
+        Name = 'forget time',
+        Tab = 'targeting',
+        SeparateGroup = true,
+        Min = 0,
+        Max = 10,
+        Default = 1,
+        Decimal = 10,
+        Suffix = 's'
+    })
+
+    TargetPart = SilentAim:AddDropdown({
+        Name = 'target part',
+        Tab = 'targeting',
+        SeparateGroup = true,
+        List = R15Parts,
+        Default = 'Head',
+        Function = function()
+            LockedTarget = nil
+            LockedTargetPart = nil
+        end
+    })
+
+    ClosestPartBlacklist = SilentAim:AddDropdown({
+        Name = 'closest part blacklist',
+        Tab = 'targeting',
+        SeparateGroup = true,
+        List = R15Parts,
+        Default = R15LimbParts,
+        Multi = true
+    })
+
+    Manipulation = SilentAim:AddToggle({
+        Name = 'manipulation',
+        Default = false
+    })
+
+    ClosestPart = SilentAim:AddToggle({
+        Name = 'closest part',
+        Default = false
+    })
+
+    Visualize = SilentAim:AddToggle({
+        Name = 'visualize',
+        Default = true,
+        Function = function(val)
+            ShowTarget.Enabled = val
+        end
+    })
+    
+    if false then
+    Mode = SilentAim:AddDropdown({
+        Name = 'Mode',
+        List = {'Position', 'Mouse', 'Rage'},
+        Function = function(val)
+            Range.Frame.Visible = (val ~= "Rage")
+        end
+    })
+    end
+    
+    HeadshotChance = SilentAim:AddSlider({
+        Name = 'headshot chance',
+        Min = 0,
+        Max = 100,
+        Default = 65,
+        Suffix = '%'
+    })
+    
+    AutoFire = SilentAim:AddToggle({
+        Name = 'auto shoot',
+        Function = function(callback)
+            if SilentAim.Enabled then
+                SilentAim:Toggle()
+                SilentAim:Toggle()
+            end
+        end
+    })
+
+    AutoReload = SilentAim:AddToggle({
+        Name = 'auto reload',
+        Default = true
+    })
+
+    RageCircle = SilentAim:AddToggle({
+        Name = 'show fov',
+        Default = true,
+        Colors = {Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255)},
+        ColorTransparency = {0, 0, 0},
+        Function = function(state)
+            if state then
+                ensureCircle()
+                if FillCircleObject then
+                    FillCircleObject.Visible = false
+                end
+                if CircleObject then
+                    CircleObject.Visible = false
+                end
+            else
+                hideDrawingLines(FillGradientLines)
+                hideDrawingLines(OutlineGradientLines)
+                removeCircle()
+            end
+            
+            CircleFilled.Frame.Visible = state
+        end
+    })
+
+    Outline = SilentAim:AddToggle({
+        Name = 'outline',
+        Colors = {Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255)},
+        ColorTransparency = {0, 0, 0},
+        Function = function()
+            if CircleObject then
+                CircleObject.Thickness = Outline.Enabled and 2 or 1
+            end
+        end
+    })
+
+    CircleFilled = SilentAim:AddToggle({
+        Name = 'fill',
+        Colors = {Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255)},
+        ColorTransparency = {0, 0, 0},
+        Function = function(val)
+            hideDrawingLines(FillGradientLines)
+            if FillCircleObject then
+                FillCircleObject.Visible = false
+            end
+            if CircleObject then
+                CircleObject.Filled = false
+            end
+        end
+    })
+    task.defer(function()
+        if RageCircle and RageCircle.Enabled then
+            ensureCircle()
+        end
+    end)
+
+    Lerp = SilentAim:AddSlider({
+        Name = 'lerp',
+        Min = 1,
+        Max = 10,
+        Default = 1,
+        Decimal = 10,
+        Suffix = 'x'
+    })
+
+    MovingRotation = SilentAim:AddToggle({
+        Name = 'moving rotation'
+    })
+
+    RotationValue = SilentAim:AddSlider({
+        Name = 'rotation',
+        Min = 0,
+        Max = 360,
+        Default = 0,
+        Suffix = '°',
+        Compact = true
+    })
+
+    RotationSpeed = SilentAim:AddSlider({
+        Name = 'speed',
+        Min = 1,
+        Max = 10,
+        Default = 1,
+        Decimal = 10,
+        Suffix = 'rps',
+        Compact = true,
+        Parent = RotationValue
+    })
+
+    FOVPosition = SilentAim:AddDropdown({
+        Name = 'fov settings',
+        List = {'', 'position on target', 'position on barrel'},
+        Default = '',
+        Function = function()
+            SilentTargetPart = nil
+        end
+    })
+    
+    Range = SilentAim:AddSlider({
+        Name = 'radius',
+        Min = 10,
+        Max = 1000,
+        Default = 100,
+        Function = function(val)
+            if FillCircleObject then
+                FillCircleObject.Size = UDim2.fromOffset(val * 2, val * 2)
+            end
+            if CircleObject then
+                CircleObject.Radius = val
+            end
+        end,
+        Suffix = 'px'
+    })
+
+    HitChance = SilentAim:AddSlider({
+        Name = 'hit chance',
+        Min = 0,
+        Max = 100,
+        Default = 100,
+        Suffix = '%'
+    })
+    
+    if false then
+    ShowTarget = SilentAim:AddToggle({
+        Name = 'Target Hud',
+        Darker = true,
+        Visible = false,
+        Function = function(val)
+            
+        end
+    })
+    end
+    ShowTarget = {Enabled = Visualize and Visualize.Enabled or false}
+end)
+
+
+run(function()
+    local Ragebot
+    local RagebotSettings = {
+        on = false,
+        targetMode = "Closest",
+        autoSwitch = true,
+        autoSwapSecondary = true,
+        autoReloadPrimary = true,
+        attackMode = "gun",
+        preferredWeapon = "primary",
+        meleeSlot = 3,
+        weaponSpecialize = true,
+        autoEquipPreferred = true,
+        preferProjectile = false,
+        autoPriority = false,
+        priorityAttackers = true,
+        priorityVoided = true,
+        sendNotification = false,
+        prioritizedPlayer = nil,
+        primarySlot = 1,
+        secondarySlot = 2,
+        acSpd = 0.05,
+        shootDelay = 0,
+        teleportDelay = 0.04,
+        orbitDist = 3,
+        orbitHeight = 2,
+        randomMovement = false,
+        randomRefresh = 0.08,
+        mode = "Orbit",
+        strafeSpeed = 5,
+        undergroundDepth = 6,
+        behindDist = 4,
+        antiAim = false,
+        hyper = false,
+        useManipulation = true,
+        voidSpam = true,
+        voidHideTime = 0.25,
+        voidShootTime = 0.03,
+        shootAttempts = 1,
+        otherMatchAvoidDistance = 1000,
+        settleUntil = 0,
+        dirBack = true,
+        dirFront = false,
+        dirLeft = true,
+        dirRight = true,
+        dirUp = true,
+        dirDown = false,
+    }
+
+    local function markRagebotSettingsDirty()
+        RagebotSettings.settleUntil = 0
+    end
+
+    local rbGen = 0
+    local rbDuelMod, rbInMatchT, rbInMatch = nil, 0, false
+    local rbTgtT = 0
+    local slotKey = {[1] = Enum.KeyCode.One, [2] = Enum.KeyCode.Two, [3] = Enum.KeyCode.Three, [4] = Enum.KeyCode.Four}
+
+    Ragebot = Movement:AddModule({
+        Name = 'Ragebot',
+        Function = function(callback)
+            local cfg = RagebotSettings
+
+            if callback then
+                if getgenv().__IDKRagebotStop then
+                    pcall(getgenv().__IDKRagebotStop)
+                    getgenv().__IDKRagebotStop = nil
+                end
+
+                cfg.on = true
+                cfg.settleUntil = 0
+
+                local players = cloneref(game:GetService("Players"))
+                local runservice = cloneref(game:GetService("RunService"))
+                local vim = cloneref(game:GetService("VirtualInputManager"))
+                local ws = cloneref(game:GetService("Workspace"))
+                local rs = cloneref(game:GetService("ReplicatedStorage"))
+                local lplr = players.LocalPlayer
+
+                local util, enums, useItemRemote, fighterCtrl
+                pcall(function()
+                    util = require(rs.Modules.Utility)
+                    enums = require(rs.Modules.EnumLibrary)
+                    useItemRemote = rs.Remotes.Replication.Fighter.UseItem
+                    fighterCtrl = require(lplr.PlayerScripts.Controllers.FighterController)
+                end)
+
+                local state = {
+                    active = true,
+                    orbitRenderRunning = false,
+                    orbitClientCF = nil,
+                    target = nil,
+                    conn = nil,
+                    ammoThread = nil,
+                    voidThread = nil,
+                    voidHbConn = nil,
+                    csyncHbConn = nil,
+                    voidExposed = false,
+                    voidTargetCF = nil,
+                    nextTeleportAt = 0,
+                    ammoActionAt = 0,
+                    hideOrbitUntil = 0,
+                    randPos = nil,
+                    randT = 0,
+                    lastFakePos = nil,
+                    csyncCF = nil,
+                    csyncLV = nil,
+                    csyncAV = nil,
+                    csyncLocalCF = nil,
+                    csyncLocalLV = nil,
+                    csyncLocalAV = nil,
+                    csyncWroteFake = false,
+                    noclipConn = nil,
+                    suspended = isShootingRange(),
+                }
+
+                local function getRoot(char)
+                    return char and char:FindFirstChild("HumanoidRootPart")
+                end
+
+                local function getFighter()
+                    if fighterCtrl and fighterCtrl.LocalFighter then return fighterCtrl.LocalFighter end
+                    if fighterCtrl and fighterCtrl.GetFighter then
+                        local ok, fighter = pcall(fighterCtrl.GetFighter, fighterCtrl, lplr)
+                        if ok then return fighter end
+                    end
+                    return nil
+                end
+
+                local function pressKey(kc)
+                    vim:SendKeyEvent(true, kc, false, game)
+                    task.wait(0.03)
+                    vim:SendKeyEvent(false, kc, false, game)
+                end
+
+                local function scanWeapon(plr)
+                    local vms = ws:FindFirstChild("ViewModels")
+                    if not vms then return "" end
+                    for _, model in vms:GetChildren() do
+                        if model:IsA("Model") then
+                            local sp = model.Name:find(" - ", 1, true)
+                            if sp and model.Name:sub(1, sp - 1) == plr.Name then
+                                return model.Name:sub(sp + 3):lower()
+                            end
+                        end
+                    end
+                    return ""
+                end
+
+                local function playerIsDead(plr)
+                    local char = plr and plr.Character
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    return not char or not hum or hum.Health <= 0 or not getRoot(char)
+                end
+
+                local function isInvincible(plr)
+                    local char = plr and plr.Character
+                    if not char then return true end
+
+                    local root = getRoot(char)
+                    if not root then return true end
+
+                    for _, obj in root:GetChildren() do
+                        if obj:IsA("Attachment") and obj.Name == "Attachment" then
+                            return true
+                        end
+                    end
+
+                    return char:FindFirstChild("InvincibilityParticles", true) ~= nil
+                end
+
+                local function isKatana(plr)
+                    return scanWeapon(plr):find("katana", 1, true) ~= nil
+                end
+
+                local function isRiotShield(plr)
+                    local weapon = scanWeapon(plr)
+                    return weapon:find("riot", 1, true) ~= nil or weapon:find("shield", 1, true) ~= nil
+                end
+
+                local function IsValidMatch(player)
+                    return player:GetAttribute("EnvironmentID") == lplr:GetAttribute("EnvironmentID")
+                end
+
+                local function isNearOtherMatch(pos, ignorePlayer)
+                    local avoidDistance = cfg.otherMatchAvoidDistance or 1000
+                    if typeof(pos) ~= "Vector3" or avoidDistance <= 0 then return false end
+
+                    for _, plr in players:GetPlayers() do
+                        if plr ~= lplr and plr ~= ignorePlayer and not IsValidMatch(plr) then
+                            local otherRoot = getRoot(plr.Character)
+                            if otherRoot and (otherRoot.Position - pos).Magnitude <= avoidDistance then
+                                return true
+                            end
+                        end
+                    end
+
+                    return false
+                end
+
+                local function isSafeRagebotPos(pos, targetPlayer)
+                    return not isNearOtherMatch(pos, targetPlayer)
+                end
+
+                local function shouldSkip(plr)
+                    if plr == lplr or playerIsDead(plr) then return true end
+                    if not IsValidMatch(plr) then return true end
+                    if isInvincible(plr) then return true end
+                    local root = getRoot(plr.Character)
+                    if root and isNearOtherMatch(root.Position, plr) then return true end
+                    return root and root:FindFirstChild("TeammateLabel") ~= nil
+                end
+
+                local function getBestTarget()
+                    local root = getRoot(lplr.Character)
+                    if not root then return nil end
+                    if cfg.prioritizedPlayer then
+                        local priorityPlayer = players:FindFirstChild(cfg.prioritizedPlayer)
+                        if priorityPlayer and not shouldSkip(priorityPlayer) then
+                            return priorityPlayer
+                        end
+                    end
+                    local best, bestV = nil, math.huge
+                    local useHP = cfg.targetMode == "Lowest Health"
+                    for _, plr in players:GetPlayers() do
+                        if not shouldSkip(plr) then
+                            local char = plr.Character
+                            local tr = getRoot(char)
+                            local hum = char and char:FindFirstChildOfClass("Humanoid")
+                            local value = useHP and hum.Health or (tr.Position - root.Position).Magnitude
+                            if cfg.autoPriority then
+                                if cfg.priorityVoided and tr.Position.Magnitude > 1000000 then
+                                    value -= 2000000000
+                                end
+                                if cfg.priorityAttackers and scanWeapon(plr) ~= "" then
+                                    value -= 1000000000
+                                end
+                            end
+                            if value < bestV then
+                                bestV = value
+                                best = plr
+                            end
+                        end
+                    end
+                    return best
+                end
+
+                local function hasValidTarget()
+                    return state.target and not playerIsDead(state.target) and not isInvincible(state.target)
+                end
+
+                local function updateRagebotStatus()
+                    local target = hasValidTarget() and state.target or nil
+                    local voiding = not target or ((cfg.mode == "Void" or cfg.mode == "Orbit") and not state.voidExposed)
+                    setRagebotStatus(state.active and cfg.on, target, voiding)
+                end
+
+                local function shouldShoot()
+                    if not hasValidTarget() then return false end
+                    if isKatana(state.target) then return false end
+                    if cfg.mode == "Void" and not state.voidExposed then return false end
+                    return true
+                end
+
+                local function getEquippedSlot()
+                    local fighter = getFighter()
+                    local item = fighter and fighter.EquippedItem
+                    if not item then return nil end
+                    local slot = item:Get("Slot")
+                    return tonumber(slot)
+                end
+
+                local function equipSlot(slot)
+                    slot = tonumber(slot) or 1
+                    local key = slotKey[slot] or Enum.KeyCode.One
+                    pcall(function()
+                        pressKey(key)
+                    end)
+                end
+
+                -- 무기별 특화 레이지 프로파일
+                local function applyWeaponRageProfile()
+                    if cfg.weaponSpecialize == false then return "default" end
+                    local slot = getEquippedSlot()
+                    local pref = cfg.preferredWeapon or "primary"
+
+                    -- preferred 자동 장착
+                    if cfg.autoEquipPreferred ~= false then
+                        local want = (pref == "secondary" and (cfg.secondarySlot or 2))
+                            or (pref == "melee" and (cfg.meleeSlot or 3))
+                            or (cfg.primarySlot or 1)
+                        if slot ~= want then
+                            equipSlot(want)
+                            slot = want
+                        end
+                    end
+
+                    local kind
+                    if slot == (cfg.meleeSlot or 3) or pref == "melee" then
+                        kind = "melee"
+                    elseif slot == (cfg.secondarySlot or 2) or pref == "secondary" then
+                        kind = "secondary"
+                    else
+                        kind = "primary"
+                    end
+
+                    if kind == "primary" then
+                        -- 주무기: 공격적 Orbit + 예측 강함
+                        cfg.mode = "Orbit"
+                        cfg.hyper = true
+                        cfg.orbitDist = 3.2
+                        cfg.orbitHeight = 2.2
+                        cfg.strafeSpeed = 6
+                        cfg.teleportDelay = 0.035
+                        cfg.predictLead = 0.14
+                        cfg.behindDist = 3.5
+                        cfg.randomMovement = false
+                        cfg.dirBack = true
+                        cfg.dirFront = false
+                        cfg.dirLeft = true
+                        cfg.dirRight = true
+                    elseif kind == "secondary" then
+                        -- 보조무기: Teleport 예측 특화 (빠른 재배치)
+                        cfg.mode = "Teleport"
+                        cfg.hyper = false
+                        cfg.orbitDist = 2.6
+                        cfg.orbitHeight = 1.6
+                        cfg.strafeSpeed = 4
+                        cfg.teleportDelay = 0.028
+                        cfg.predictLead = 0.11
+                        cfg.behindDist = 3.0
+                        cfg.randomMovement = true
+                        cfg.randomRefresh = 0.07
+                        cfg.dirBack = true
+                        cfg.dirFront = true
+                        cfg.dirLeft = true
+                        cfg.dirRight = true
+                    else
+                        -- 근접: 바짝 붙는 Underground/Behind 특화
+                        cfg.mode = "Underground"
+                        cfg.hyper = true
+                        cfg.orbitDist = 1.6
+                        cfg.orbitHeight = 0.6
+                        cfg.strafeSpeed = 8
+                        cfg.teleportDelay = 0.02
+                        cfg.predictLead = 0.08
+                        cfg.behindDist = 2.2
+                        cfg.undergroundDepth = 4
+                        cfg.randomMovement = false
+                        cfg.dirBack = true
+                        cfg.dirFront = false
+                        cfg.dirLeft = true
+                        cfg.dirRight = true
+                        cfg.dirDown = true
+                    end
+
+                    state.weaponKind = kind
+                    return kind
+                end
+
+                local function handleAmmo()
+                    local fighter = getFighter()
+                    local item = fighter and fighter.EquippedItem
+                    if not fighter or not item then return false end
+                    local ammo = item:Get("Ammo") or 0
+                    local slot = item:Get("Slot") or 1
+                    local now = tick()
+                    if fighter:Get("Reloading") then
+                        state.hideOrbitUntil = math.max(state.hideOrbitUntil or 0, now + 0.25)
+                        state.ammoActionAt = math.max(state.ammoActionAt or 0, now + 0.1)
+                        return true
+                    end
+                    if ammo > 0 then return false end
+                    if now < (state.ammoActionAt or 0) then return true end
+
+                    local primary = cfg.primarySlot or 1
+                    local secondary = cfg.secondarySlot or 2
+                    if slot == primary and cfg.autoSwapSecondary then
+                        state.ammoActionAt = now + 0.45
+                        state.hideOrbitUntil = math.max(state.hideOrbitUntil or 0, now + 0.45)
+                        pressKey(slotKey[secondary] or Enum.KeyCode.Two)
+                        return true
+                    end
+                    if slot == secondary and cfg.autoReloadPrimary then
+                        state.ammoActionAt = now + 0.6
+                        state.hideOrbitUntil = math.max(state.hideOrbitUntil or 0, now + 0.75)
+                        pressKey(slotKey[primary] or Enum.KeyCode.One)
+                        task.delay(0.18, function()
+                            if not state.active then return end
+                            local f2 = getFighter()
+                            local i2 = f2 and f2.EquippedItem
+                            if f2 and i2 and (i2:Get("Slot") or 1) == primary and (i2:Get("Ammo") or 0) <= 0 and not f2:Get("Reloading") then
+                                pressKey(Enum.KeyCode.R)
+                            end
+                        end)
+                        return true
+                    end
+                    if slot == primary and cfg.autoReloadPrimary then
+                        state.ammoActionAt = now + 0.5
+                        state.hideOrbitUntil = math.max(state.hideOrbitUntil or 0, now + 0.75)
+                        pressKey(Enum.KeyCode.R)
+                        return true
+                    end
+                    return true
+                end
+
+                local function buildCameraData(fromPos, part)
+                    if not util or not part then return nil end
+                    local look = CFrame.new(fromPos, part.Position)
+                    local data = {}
+                    data[utf8.char(1)] = {
+                        [utf8.char(0)] = util:EncodeCFrame(look),
+                        [utf8.char(1)] = util:EncodeCFrame(look),
+                        [utf8.char(2)] = part,
+                        [utf8.char(3)] = util:EncodeCFrame(part.CFrame:ToObjectSpace(CFrame.new(part.Position)))
+                    }
+                    return data
+                end
+
+                local function doFire(part)
+                    local fighter = getFighter()
+                    local item = fighter and fighter.EquippedItem
+                    if not item or not part then return false end
+
+                    local cam = ws.CurrentCamera
+                    local fromPos = (state.csyncCF and state.csyncCF.Position) or (cam and cam.CFrame.Position) or part.Position
+                    local anyFired = false
+                    local attempts = math.max(1, math.floor(cfg.shootAttempts or 1))
+
+                    for _ = 1, attempts do
+                        local fired = false
+                        if cfg.useManipulation and useItemRemote and enums and util then
+                            local ammo = item.Get and (item:Get("Ammo") or 0) or 0
+                            if ammo > 0 then
+                                local oid = item:Get("ObjectID")
+                                local shootEnum = enums:ToEnum("StartShooting")
+                                local data = buildCameraData(fromPos, part)
+                                if oid and shootEnum and data then
+                                    fired = pcall(function()
+                                        useItemRemote:FireServer(oid, shootEnum, data, nil)
+                                    end)
+                                end
+                            end
+                        end
+
+                        if not fired and item.UseItem then
+                            fired = pcall(function() item:UseItem() end)
+                        end
+                        if not fired and fighter and fighter.UseItem then
+                            fired = pcall(function() fighter:UseItem() end)
+                        end
+                        anyFired = anyFired or fired
+                    end
+                    return anyFired
+                end
+
+                local function isLobby()
+                    local playerGui = lplr:FindFirstChild("PlayerGui")
+                    local mainGui = playerGui and playerGui:FindFirstChild("MainGui")
+                    local mainFrame = mainGui and mainGui:FindFirstChild("MainFrame")
+                    local lobby = mainFrame and mainFrame:FindFirstChild("Lobby")
+                    local currency = lobby and lobby:FindFirstChild("Currency")
+                    return currency and currency.Visible == true
+                end
+
+                local function getDuel()
+                    if not rbDuelMod then
+                        local ps = lplr:FindFirstChild("PlayerScripts")
+                        local ct = ps and ps:FindFirstChild("Controllers")
+                        local dc = ct and ct:FindFirstChild("DuelController")
+                        if dc then
+                            local ok, mod = pcall(require, dc)
+                            if ok and mod then rbDuelMod = mod end
+                        end
+                    end
+
+                    if rbDuelMod and rbDuelMod.GetDuel then
+                        local ok, duel = pcall(rbDuelMod.GetDuel, rbDuelMod, lplr)
+                        if ok then return duel end
+                    end
+                end
+
+                local function isValidMatch()
+                    if isLobby() or isShootingRange() then return false end
+
+                    local char = lplr.Character
+                    local root = getRoot(char)
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    if not char or not root or not hum or hum.Health <= 0 then
+                        return false
+                    end
+
+                    local duel = getDuel()
+                    if duel ~= nil then
+                        return true
+                    end
+
+                    local fighter = getFighter()
+                    return fighter ~= nil
+                end
+
+                local function inMatch()
+                    local now = tick()
+                    if now - rbInMatchT < 0.25 then return rbInMatch end
+                    rbInMatchT = now
+                    rbInMatch = isValidMatch()
+                    return rbInMatch
+                end
+
+                local function undergroundPos(head, targetRoot)
+                    local depth = math.clamp(cfg.undergroundDepth or 6, 3, 8)
+                    local radius = math.clamp(cfg.orbitDist or 3, 1.25, 4)
+                    return head.Position - targetRoot.CFrame.LookVector * radius + Vector3.new(0, -depth, 0)
+                end
+
+                local oldFireServerRagebot
+                local rbHookInstalled = false
+                local enterVoidState
+                local setVoidCsync
+                local function installRagebotHook()
+                    if rbHookInstalled then return end
+                    if not useItemRemote then return end
+                    rbHookInstalled = true
+                    oldFireServerRagebot = hookfunction(useItemRemote.FireServer, newcclosure(function(self, oid, action, cameradata, ...)
+                        if state.active and cfg.on and cfg.mode == "Void" and cfg.useManipulation and action == enums:ToEnum("StartShooting") then
+                            if isLobby() or not inMatch() then
+                                return oldFireServerRagebot(self, oid, action, cameradata, ...)
+                            end
+                            
+                            local target = state.target
+                            if hasValidTarget() and not isKatana(target) then
+                                local tc = target.Character
+                                local tr = getRoot(tc)
+                                local head = tc and (tc:FindFirstChild("Head") or tr)
+                                if tr and head then
+                                    local shootPos = isRiotShield(target)
+                                        and (tr.Position - tr.CFrame.LookVector * (cfg.behindDist or 4))
+                                        or (tr.Position - tr.CFrame.LookVector * 2.5 + Vector3.new(0, 1.5, 0))
+                                    if not isSafeRagebotPos(shootPos, target) then
+                                        enterVoidState()
+                                        return oldFireServerRagebot(self, oid, action, cameradata, ...)
+                                    end
+                                    local shootCF = CFrame.new(shootPos, head.Position)
+                                    
+                                    state.voidExposed = true
+                                    state.voidTargetCF = shootCF
+                                    setVoidCsync(shootCF, Vector3.zero, Vector3.zero)
+                                    updateRagebotStatus()
+                                    
+                                    task.wait(0.02)
+                                    
+                                    local newData = buildCameraData(shootPos, head) or cameradata
+                                    
+                                    task.spawn(function()
+                                        task.wait(0.05)
+                                        enterVoidState()
+                                    end)
+                                    
+                                    return oldFireServerRagebot(self, oid, action, newData, ...)
+                                end
+                            end
+                        end
+                        return oldFireServerRagebot(self, oid, action, cameradata, ...)
+                    end))
+                end
+
+                local function rnd()
+                    return math.random() * 2 - 1
+                end
+
+                local function rndDir()
+                    local angle = math.random() * math.pi * 2
+                    return Vector3.new(math.cos(angle), 0, math.sin(angle))
+                end
+
+                local function getDirs(targetRoot)
+                    local dirs = {}
+                    local look = targetRoot.CFrame.LookVector
+                    local right = targetRoot.CFrame.RightVector
+                    if cfg.dirBack then table.insert(dirs, -look) end
+                    if cfg.dirFront then table.insert(dirs, look) end
+                    if cfg.dirLeft then table.insert(dirs, -right) end
+                    if cfg.dirRight then table.insert(dirs, right) end
+                    if #dirs == 0 then
+                        dirs[1] = -look
+                        dirs[2] = right
+                        dirs[3] = -right
+                    end
+                    return dirs
+                end
+
+                local function pickOffset(targetRoot, head)
+                    local dirs = getDirs(targetRoot)
+                    local dir = dirs[math.random(1, #dirs)]
+                    local radius = math.clamp(cfg.orbitDist or 3, 1.25, 5)
+                    local height = math.clamp(cfg.orbitHeight or 2, -2, 6)
+                    local pos = head.Position + dir * radius + Vector3.new(0, height, 0)
+                    if cfg.dirUp and math.random() < 0.2 then
+                        pos += Vector3.new(0, math.max(1, height), 0)
+                    elseif cfg.dirDown and math.random() < 0.15 then
+                        pos += Vector3.new(0, -math.max(1, math.min(3, cfg.undergroundDepth or 2)), 0)
+                    end
+                    return pos
+                end
+
+                local function setCsync(cf, pos, dt)
+                    local old = state.lastFakePos
+                    state.csyncCF = cf
+                    state.csyncLV = old and dt and dt > 0 and (pos - old) / dt or Vector3.zero
+                    state.csyncAV = Vector3.zero
+                    state.lastFakePos = pos
+                end
+
+                local function applyExternalMovementVelocity()
+                    local fn = getgenv and getgenv().__LionApplyMovementVelocity
+                    if type(fn) == "function" then
+                        pcall(fn)
+                    end
+                end
+
+                local function clearCsyncTarget()
+                    state.csyncCF = nil
+                    state.csyncLV = nil
+                    state.csyncAV = nil
+                    state.lastFakePos = nil
+                end
+
+                local function isRagebotSettling()
+                    return os.clock() < (cfg.settleUntil or 0)
+                end
+
+                local function restoreLocalRoot(root)
+                    if not root or not state.csyncLocalCF then return false end
+                    local liveVelocity = root.AssemblyLinearVelocity
+                    root.CFrame = state.csyncLocalCF
+                    if state.csyncLocalLV then
+                        root.AssemblyLinearVelocity = Vector3.new(state.csyncLocalLV.X, liveVelocity.Y, state.csyncLocalLV.Z)
+                    end
+                    if state.csyncLocalAV then
+                        root.AssemblyAngularVelocity = state.csyncLocalAV
+                    end
+                    return true
+                end
+
+                local function startCsync()
+                    if state.csyncHbConn then return end
+                    state.csyncHbConn = runservice.Heartbeat:Connect(function()
+                        local root = getRoot(lplr.Character)
+                        if not root then return end
+                        if state.csyncWroteFake and state.csyncLocalCF then
+                            restoreLocalRoot(root)
+                        end
+                        if isRagebotSettling() then
+                            state.csyncLocalCF = root.CFrame
+                            state.csyncLocalLV = root.AssemblyLinearVelocity
+                            state.csyncLocalAV = root.AssemblyAngularVelocity
+                            state.csyncWroteFake = false
+                            return
+                        end
+                        state.csyncLocalCF = root.CFrame
+                        state.csyncLocalLV = root.AssemblyLinearVelocity
+                        state.csyncLocalAV = root.AssemblyAngularVelocity
+                        if state.csyncCF then
+                            root.CFrame = state.csyncCF
+                            local fakeVelocity = state.csyncLV or state.csyncLocalLV or root.AssemblyLinearVelocity
+                            local localVelocity = state.csyncLocalLV or root.AssemblyLinearVelocity
+                            root.AssemblyLinearVelocity = Vector3.new(fakeVelocity.X, localVelocity.Y, fakeVelocity.Z)
+                            root.AssemblyAngularVelocity = state.csyncAV or state.csyncLocalAV or root.AssemblyAngularVelocity
+                            state.csyncWroteFake = true
+                        else
+                            state.csyncWroteFake = false
+                        end
+                    end)
+                    runservice:BindToRenderStep("IDK_RagebotCsync", Enum.RenderPriority.Camera.Value - 1, function()
+                        local root = getRoot(lplr.Character)
+                        if not root or not state.csyncLocalCF then return end
+                        local restored = false
+                        if state.csyncWroteFake and restoreLocalRoot(root) then
+                            state.csyncWroteFake = false
+                            restored = true
+                        end
+                        if restored then
+                            applyExternalMovementVelocity()
+                        end
+                    end)
+                end
+
+                local function stopCsync()
+                    if state.csyncHbConn then state.csyncHbConn:Disconnect(); state.csyncHbConn = nil end
+                    runservice:UnbindFromRenderStep("IDK_RagebotCsync")
+                    restoreLocalRoot(getRoot(lplr.Character))
+                    clearCsyncTarget()
+                    state.csyncLocalCF = nil
+                    state.csyncLocalLV = nil
+                    state.csyncLocalAV = nil
+                    state.csyncWroteFake = false
+                end
+
+                local function voidRand()
+                    local n = math.random(-2147483646, 2147483646)
+                    repeat
+                        n = math.random(-2147483646, 2147483646)
+                    until n < -1147483646 or n > 1147483646
+                    return n
+                end
+
+                local function voidRandCF()
+                    return CFrame.new(voidRand(), voidRand(), voidRand()) * CFrame.Angles(math.pi, math.pi, math.pi)
+                end
+
+                setVoidCsync = function(cf, lv, av)
+                    state.csyncCF = cf
+                    state.csyncLV = lv or Vector3.zero
+                    state.csyncAV = av or Vector3.zero
+                    state.lastFakePos = cf and cf.Position or nil
+                end
+
+                enterVoidState = function()
+                    state.voidTargetCF = nil
+                    state.voidExposed = false
+                    state.orbitClientCF = nil
+
+                    if not state.active or not cfg.on then
+                        clearCsyncTarget()
+                        updateRagebotStatus()
+                        return
+                    end
+
+                    if cfg.voidSpam then
+                        setVoidCsync(voidRandCF())
+                    else
+                        clearCsyncTarget()
+                    end
+                    updateRagebotStatus()
+                end
+
+                local function enableVoidCsync()
+                    if state.voidHbConn then return end
+                    startCsync()
+                    state.voidHbConn = runservice.Heartbeat:Connect(function()
+                        if isRagebotSettling() then
+                            state.voidTargetCF = nil
+                            state.voidExposed = false
+                            clearCsyncTarget()
+                            return
+                        end
+                        local targetCF = state.voidTargetCF
+                        if targetCF then
+                            setVoidCsync(targetCF, Vector3.zero, Vector3.zero)
+                        elseif cfg.voidSpam then
+                            setVoidCsync(voidRandCF())
+                        else
+                            clearCsyncTarget()
+                        end
+                    end)
+                end
+
+                local function disableVoidCsync()
+                    if state.voidHbConn then state.voidHbConn:Disconnect(); state.voidHbConn = nil end
+                    runservice:UnbindFromRenderStep("IDK_RagebotVoid")
+                    state.voidTargetCF = nil
+                    state.voidThread = nil
+                    state.voidExposed = false
+                end
+
+                -- Orbit render-fix for Ragebot Orbit mode (client-side visual orbit while server is voided)
+                local function StartOrbitRenderFix()
+                    if state.orbitRenderRunning then return end
+                    state.orbitRenderRunning = true
+                    runservice:BindToRenderStep("IDK_RagebotOrbit", Enum.RenderPriority.First.Value, function()
+                        if not state.orbitClientCF then return end
+                        local root = getRoot(lplr.Character)
+                        if not root then return end
+                        root.CFrame = state.orbitClientCF
+                        applyExternalMovementVelocity()
+                    end)
+                end
+
+                local function StopOrbitRenderFix()
+                    if not state.orbitRenderRunning then return end
+                    runservice:UnbindFromRenderStep("IDK_RagebotOrbit")
+                    state.orbitRenderRunning = false
+                    state.orbitClientCF = nil
+                end
+
+                local function startVoidLoop(myGen)
+                    if state.voidThread then return end
+                    enableVoidCsync()
+                    local voidThread
+                    voidThread = task.spawn(function()
+                        while state.active and cfg.on and rbGen == myGen and not state.suspended do
+                            if isRagebotSettling() then
+                                state.voidTargetCF = nil
+                                state.voidExposed = false
+                                clearCsyncTarget()
+                                task.wait(0.03)
+                                continue
+                            end
+                            if not inMatch() or not hasValidTarget() or isKatana(state.target) then
+                                enterVoidState()
+                                task.wait(0.1)
+                                continue
+                            end
+
+                            enterVoidState()
+                            if cfg.voidHideTime > 0 then task.wait(cfg.voidHideTime) end
+                            if not state.active or not cfg.on or rbGen ~= myGen or state.suspended or not inMatch() then break end
+
+                            local target = state.target
+                            if hasValidTarget() and not isKatana(target) then
+                                local tc = target.Character
+                                local tr = getRoot(tc)
+                                local head = tc and (tc:FindFirstChild("Head") or tr)
+                                if tr and head then
+                                    local shootPos = isRiotShield(target)
+                                        and (tr.Position - tr.CFrame.LookVector * (cfg.behindDist or 4))
+                                        or (tr.Position - tr.CFrame.LookVector * 2.5 + Vector3.new(0, 1.5, 0))
+                                    if not isSafeRagebotPos(shootPos, target) then
+                                        enterVoidState()
+                                        task.wait(0.1)
+                                        continue
+                                    end
+                                    local shootCF = CFrame.new(shootPos, head.Position)
+                                    state.voidExposed = true
+                                    state.voidTargetCF = shootCF
+                                    setVoidCsync(shootCF, Vector3.zero, Vector3.zero)
+                                    updateRagebotStatus()
+                                    if cfg.voidShootTime > 0 then task.wait(cfg.voidShootTime) end
+                                    if hasValidTarget() and not isKatana(target) then
+                                        doFire(head)
+                                    end
+                                    task.wait(0.05)
+                                    enterVoidState()
+                                end
+                            end
+                        end
+
+                        if state.voidThread == voidThread then
+                            state.voidThread = nil
+                        end
+                        if rbGen == myGen and not state.suspended and state.voidThread == nil then
+                            disableVoidCsync()
+                        end
+                    end)
+                    state.voidThread = voidThread
+                end
+
+                local function enableNoclip()
+                    if state.noclipConn then return end
+                    state.noclipConn = runservice.Stepped:Connect(function()
+                        local char = lplr.Character
+                        if not char then return end
+                        for _, part in char:GetDescendants() do
+                            if part:IsA("BasePart") then
+                                part.CanCollide = false
+                            end
+                        end
+                    end)
+                end
+
+                local function startAmmoLoop()
+                    if state.ammoThread then return end
+                    state.ammoThread = task.spawn(function()
+                        while state.active do
+                            if isShootingRange() then
+                                task.wait(0.1)
+                                continue
+                            end
+                            if not handleAmmo() and shouldShoot() and not cfg.hyper then
+                                local tc = state.target and state.target.Character
+                                local head = tc and (tc:FindFirstChild("Head") or getRoot(tc))
+                                if head then
+                                    if cfg.shootDelay > 0 then task.wait(cfg.shootDelay) end
+                                    doFire(head)
+                                end
+                            end
+                            task.wait(math.max(0.01, cfg.acSpd))
+                        end
+                        state.ammoThread = nil
+                    end)
+                end
+
+                local function stopRagebot()
+                    rbGen += 1
+                    state.active = false
+                    cfg.on = false
+                    setRagebotStatus(false)
+                    if state.conn then state.conn:Disconnect(); state.conn = nil end
+                    if state.noclipConn then state.noclipConn:Disconnect(); state.noclipConn = nil end
+                    state.target = nil
+                    state.voidExposed = false
+                    state.nextTeleportAt = 0
+                    state.ammoActionAt = 0
+                    state.hideOrbitUntil = 0
+                    state.randPos = nil
+                    state.randT = 0
+                    state.lastFakePos = nil
+                    rbInMatchT = 0
+                    rbInMatch = false
+                    stopCsync()
+                    disableVoidCsync()
+                    StopOrbitRenderFix()
+                    local char = lplr.Character
+                    if char then
+                        for _, part in char:GetDescendants() do
+                            if part:IsA("BasePart") then
+                                part.CanCollide = true
+                            end
+                        end
+                    end
+                end
+
+                rbGen += 1
+                local myGen = rbGen
+                setRagebotStatus(true, nil, true)
+                startAmmoLoop()
+                installRagebotHook()
+                if not state.suspended then
+                    enableNoclip()
+                    if cfg.mode == "Void" then
+                        startVoidLoop(myGen)
+                    elseif cfg.mode == "Orbit" then
+                        -- Use Void csync as idle state; we'll expose an orbit CFrame while attacking
+                        enableVoidCsync()
+                    else
+                        startCsync()
+                    end
+                end
+
+                local aaPhase = 0
+                local orbitAngle = math.random() * math.pi * 2
+
+                state.conn = runservice.Stepped:Connect(function(_, dt)
+                    if not state.active or not cfg.on then
+                        if state.conn then state.conn:Disconnect(); state.conn = nil end
+                        return
+                    end
+
+                    if isShootingRange() then
+                        if not state.suspended then
+                            state.suspended = true
+                            state.target = nil
+                            state.randPos = nil
+                            state.voidTargetCF = nil
+                            state.voidExposed = false
+                            if state.noclipConn then
+                                state.noclipConn:Disconnect()
+                                state.noclipConn = nil
+                            end
+                            stopCsync()
+                            disableVoidCsync()
+                            StopOrbitRenderFix()
+                            updateRagebotStatus()
+                        end
+                        return
+                    end
+
+                    if state.suspended then
+                        state.suspended = false
+                        enableNoclip()
+                        if cfg.mode == "Void" then
+                            startVoidLoop(myGen)
+                        elseif cfg.mode == "Orbit" then
+                            enableVoidCsync()
+                            StartOrbitRenderFix()
+                        else
+                            startCsync()
+                        end
+                    end
+
+                    local root = getRoot(lplr.Character)
+                    if not root then return end
+
+                    if isRagebotSettling() then
+                        state.voidTargetCF = nil
+                        state.voidExposed = false
+                        state.orbitClientCF = nil
+                        clearCsyncTarget()
+                        updateRagebotStatus()
+                        return
+                    end
+
+                    if not inMatch() then
+                        clearCsyncTarget()
+                        state.target = nil
+                        if cfg.mode == "Orbit" then
+                            enterVoidState()
+                        else
+                            updateRagebotStatus()
+                        end
+                        return
+                    end
+
+                    local now = tick()
+                    if state.target and playerIsDead(state.target) then
+                        state.target = nil
+                    end
+
+                    if state.target and isInvincible(state.target) then
+                        clearCsyncTarget()
+                        if cfg.mode == "Orbit" then
+                            enterVoidState()
+                        else
+                            updateRagebotStatus()
+                        end
+                        return
+                    end
+
+                    if now - rbTgtT >= 0.05 and (cfg.autoSwitch or not state.target) then
+                        rbTgtT = now
+                        if cfg.autoSwitch then
+                            local target = getBestTarget()
+                            if target then
+                                if cfg.sendNotification and state.target ~= target then
+                                    mainapi:SafeNotify({
+                                        Title = "ragebot",
+                                        Text = "prioritized " .. target.Name,
+                                        Duration = 2,
+                                    })
+                                end
+                                state.target = target
+                            end
+                        elseif not state.target then
+                            state.target = getBestTarget()
+                        end
+                    end
+
+                    if not state.target then
+                        clearCsyncTarget()
+                        if cfg.mode == "Orbit" then
+                            enterVoidState()
+                        else
+                            updateRagebotStatus()
+                        end
+                        return
+                    end
+
+                    local tc = state.target.Character
+                    local tr = getRoot(tc)
+                    local head = tc and (tc:FindFirstChild("Head") or tr)
+                    if not tc or not tr or not head then
+                        state.target = nil
+                        updateRagebotStatus()
+                        return
+                    end
+
+                    if isNearOtherMatch(tr.Position, state.target) then
+                        state.target = nil
+                        state.randPos = nil
+                        if cfg.mode == "Orbit" or cfg.mode == "Void" then
+                            enterVoidState()
+                        else
+                            clearCsyncTarget()
+                            updateRagebotStatus()
+                        end
+                        return
+                    end
+
+                    updateRagebotStatus()
+
+                    applyWeaponRageProfile()
+
+                    if cfg.mode == "Void" then return end
+
+                    if cfg.mode == "Orbit" and (now < (state.hideOrbitUntil or 0) or handleAmmo()) then
+                        state.voidTargetCF = nil
+                        state.voidExposed = false
+                        state.orbitClientCF = nil
+                        enterVoidState()
+                        return
+                    end
+
+                    local isUnderground = cfg.mode == "Underground"
+                    local isShield = isRiotShield(state.target)
+                    local height = math.clamp(cfg.orbitHeight or 2, -2, 6)
+                    local radius = math.clamp(cfg.orbitDist or 3, 1.25, 5)
+                    local targetPos
+
+                    if isShield then
+                        targetPos = tr.Position - tr.CFrame.LookVector * (cfg.behindDist or 3)
+                    elseif isUnderground then
+                        targetPos = undergroundPos(head, tr)
+                    elseif cfg.mode == "Teleport" then
+                        if cfg.randomMovement then
+                            if not state.randPos or (now - (state.randT or 0)) >= (cfg.randomRefresh or 0.08) then
+                                state.randT = now
+                                state.randPos = pickOffset(tr, head) + rndDir() * (math.random() * 1.05) + Vector3.new(0, rnd() * 0.7, 0)
+                            end
+                            targetPos = state.randPos
+                        else
+                            targetPos = pickOffset(tr, head)
+                        end
+                    elseif cfg.mode == "Orbit" then
+                        orbitAngle += dt * math.max(1, (cfg.strafeSpeed or 5) * 1.5)
+                        targetPos = head.Position + Vector3.new(math.cos(orbitAngle) * radius, height, math.sin(orbitAngle) * radius)
+                    else
+                        targetPos = undergroundPos(head, tr)
+                    end
+
+                    if not isSafeRagebotPos(targetPos, state.target) then
+                        state.randPos = nil
+                        if cfg.mode == "Orbit" then
+                            state.voidTargetCF = nil
+                            state.voidExposed = false
+                            state.orbitClientCF = nil
+                            enterVoidState()
+                        else
+                            clearCsyncTarget()
+                            updateRagebotStatus()
+                        end
+                        return
+                    end
+
+                    local faceCF = CFrame.new(targetPos, head.Position)
+                    if cfg.antiAim then
+                        aaPhase += dt * 20
+                        faceCF = CFrame.new(targetPos, head.Position) * CFrame.Angles(0, math.rad(math.sin(aaPhase) * 70), 0)
+                    end
+
+                    if cfg.mode == "Orbit" then
+                        if cfg.hyper or not isUnderground then
+                            -- expose orbit position to server each frame while combatting
+                            state.voidExposed = true
+                            state.voidTargetCF = faceCF
+                            setCsync(faceCF, targetPos, dt)
+                            updateRagebotStatus()
+
+                            if shouldShoot() then
+                                doFire(head)
+                            end
+                        end
+                    else
+                        setCsync(faceCF, targetPos, dt)
+
+                        if cfg.hyper or (cfg.mode == "Orbit" and not isUnderground) then
+                            if shouldShoot() then doFire(head) end
+                        elseif cfg.mode == "Teleport" and not isUnderground then
+                            if now >= (state.nextTeleportAt or 0) then
+                                state.nextTeleportAt = now + math.max(0.01, cfg.teleportDelay or 0.04)
+                                if shouldShoot() then doFire(head) end
+                            end
+                        end
+                    end
+                end)
+
+                Ragebot:Clean(lplr.CharacterAdded:Connect(function()
+                    stopCsync()
+                    disableVoidCsync()
+                    StopOrbitRenderFix()
+                    state.target = nil
+                    clearCsyncTarget()
+                    state.csyncLocalCF = nil
+                    state.csyncLocalLV = nil
+                    state.csyncLocalAV = nil
+                    state.csyncWroteFake = false
+                    state.voidExposed = false
+                    state.hideOrbitUntil = 0
+                    if state.active then
+                        task.wait(0.5)
+                        if state.active then
+                            if cfg.mode == "Void" then
+                                startVoidLoop(myGen)
+                            elseif cfg.mode == "Orbit" then
+                                enableVoidCsync()
+                                StartOrbitRenderFix()
+                            else
+                                startCsync()
+                            end
+                        end
+                    end
+                end))
+
+                getgenv().__IDKRagebotStop = stopRagebot
+                Ragebot:Clean(stopRagebot)
+            else
+                cfg.on = false
+                if getgenv().__IDKRagebotStop then
+                    pcall(getgenv().__IDKRagebotStop)
+                    getgenv().__IDKRagebotStop = nil
+                end
+            end
+        end
+    })
+
+    Ragebot:AddToggle({
+        Name = 'void spam',
+        Default = true,
+        Function = function(callback)
+            RagebotSettings.voidSpam = callback
+            markRagebotSettingsDirty()
+        end
+    })
+
+    local RagebotHide = Ragebot:AddSlider({
+        Name = 'hide',
+        Min = 0,
+        Max = 1,
+        Default = 0.25,
+        Decimal = 100,
+        Suffix = 's',
+        Compact = true,
+        Function = function(value)
+            RagebotSettings.voidHideTime = value
+            markRagebotSettingsDirty()
+        end
+    })
+
+    Ragebot:AddSlider({
+        Name = 'attack',
+        Min = 0,
+        Max = 1,
+        Default = 0.03,
+        Decimal = 100,
+        Suffix = 's',
+        Compact = true,
+        Parent = RagebotHide,
+        Function = function(value)
+            RagebotSettings.voidShootTime = value
+            markRagebotSettingsDirty()
+        end
+    })
+
+    Ragebot:AddSlider({
+        Name = 'shoot attempts',
+        Min = 1,
+        Max = 10,
+        Default = 1,
+        Suffix = 'x',
+        Function = function(value)
+            RagebotSettings.shootAttempts = math.floor(value)
+            markRagebotSettingsDirty()
+        end
+    })
+
+    Ragebot:AddDropdown({
+        Name = 'attack mode',
+        List = {'gun', 'knife', 'melee'},
+        Default = 'gun',
+        Function = function(value)
+            RagebotSettings.attackMode = value
+            markRagebotSettingsDirty()
+        end
+    })
+
+    Ragebot:AddDropdown({
+        Name = 'preferred weapon',
+        List = {'primary', 'secondary', 'melee'},
+        Default = 'primary',
+        Function = function(value)
+            RagebotSettings.preferredWeapon = value
+            if value == 'primary' then
+                RagebotSettings.primarySlot = 1
+                RagebotSettings.secondarySlot = 2
+            elseif value == 'secondary' then
+                RagebotSettings.primarySlot = 2
+                RagebotSettings.secondarySlot = 1
+            else
+                RagebotSettings.primarySlot = 1
+                RagebotSettings.secondarySlot = 2
+            end
+            markRagebotSettingsDirty()
+            -- 선택 즉시 해당 무기 자동 장착
+            pcall(function()
+                local keys = {[1]=Enum.KeyCode.One,[2]=Enum.KeyCode.Two,[3]=Enum.KeyCode.Three}
+                local slot = (value == 'primary' and 1) or (value == 'secondary' and 2) or 3
+                local vim = game:GetService("VirtualInputManager")
+                vim:SendKeyEvent(true, keys[slot], false, game)
+                task.wait()
+                vim:SendKeyEvent(false, keys[slot], false, game)
+            end)
+        end
+    })
+
+    Ragebot:AddToggle({
+        Name = 'weapon specialize',
+        Default = true,
+        Function = function(callback)
+            RagebotSettings.weaponSpecialize = callback
+            markRagebotSettingsDirty()
+        end
+    })
+
+    Ragebot:AddDropdown({
+        Name = 'settings',
+        List = {'swap weapons when empty', 'prefer projectile weapon'},
+        Default = {['swap weapons when empty'] = true},
+        Multi = true,
+        Function = function(value)
+            RagebotSettings.autoSwapSecondary = value['swap weapons when empty'] == true
+            RagebotSettings.autoReloadPrimary = value['swap weapons when empty'] == true
+            RagebotSettings.preferProjectile = value['prefer projectile weapon'] == true
+            markRagebotSettingsDirty()
+        end
+    })
+
+    Ragebot:AddToggle({
+        Name = 'auto prioritize',
+        Tab = 'priority',
+        Default = true,
+        Function = function(callback)
+            RagebotSettings.autoPriority = callback
+            RagebotSettings.autoSwitch = callback
+            markRagebotSettingsDirty()
+        end
+    })
+
+    Ragebot:AddToggle({
+        Name = 'send notification',
+        Tab = 'priority',
+        Function = function(callback)
+            RagebotSettings.sendNotification = callback
+            markRagebotSettingsDirty()
+        end
+    })
+
+    Ragebot:AddDropdown({
+        Name = 'auto priority settings',
+        Tab = 'priority',
+        List = {'attackers', 'voided players'},
+        Default = {attackers = true, ['voided players'] = true},
+        Multi = true,
+        Function = function(value)
+            RagebotSettings.priorityAttackers = value.attackers == true
+            RagebotSettings.priorityVoided = value['voided players'] == true
+            markRagebotSettingsDirty()
+        end
+    })
+
+    local function getPlayerNames()
+        local names = {}
+        for _, player in game:GetService('Players'):GetPlayers() do
+            if player ~= game:GetService('Players').LocalPlayer then
+                table.insert(names, player.Name)
+            end
+        end
+        table.sort(names)
+        return names
+    end
+
+    local Prioritized = Ragebot:AddDropdown({
+        Name = 'prioritized',
+        Tab = 'priority',
+        List = getPlayerNames(),
+        AllowNull = true,
+        Function = function(value)
+            RagebotSettings.prioritizedPlayer = value
+            markRagebotSettingsDirty()
+        end
+    })
+
+    local function refreshPriorityPlayers()
+        Prioritized:SetList(getPlayerNames())
+    end
+    Ragebot:Clean(game:GetService('Players').PlayerAdded:Connect(refreshPriorityPlayers))
+    Ragebot:Clean(game:GetService('Players').PlayerRemoving:Connect(refreshPriorityPlayers))
+end)
+
+	--######## END ORIGINAL MODULES ########
+
+	-- Bridge Rose menu toggles -> ported modules
+	task.spawn(function()
+		task.wait(0.5)
+		local lastS, lastR = false, false
+		while true do
+			task.wait(0.15)
+			local S = rawget(shared, "RoseSettings")
+			if type(S) ~= "table" then
+				S = rawget(_G, "Settings")
+			end
+			if type(S) ~= "table" then
+				continue
+			end
+			local sOn = S["silent.enabled"] == true
+			local rOn = S["rage.enabled"] == true
+			if sOn ~= lastS then
+				lastS = sOn
+				pcall(function()
+					shared.RoseCombatBridge.enableSilent(sOn)
+				end)
+			end
+			if rOn ~= lastR then
+				lastR = rOn
+				pcall(function()
+					shared.RoseCombatBridge.enableRage(rOn)
+				end)
+			end
+		end
+	end)
+end
